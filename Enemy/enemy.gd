@@ -9,3 +9,4 @@ func _process(delta: float) -> void:
 	progress += speed*delta
 	if progress_ratio >= 0.97:
 		base.take_damage()
+		queue_free()

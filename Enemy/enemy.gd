@@ -1,12 +1,22 @@
 extends PathFollow3D
 
 @export var speed: float = 5
+@export var max_health:= 50
 
 @onready var base = get_tree().get_first_node_in_group("base")
+
+var current_health: int:
+	set(health_in):
+		current_health = health_in
+		if current_health < 1:
+			queue_free()
+
+func _ready() -> void:
+	current_health = max_health
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
 	progress += speed*delta
 	if progress_ratio >= 0.97:
 		base.take_damage()
-		queue_free()
+		set_process(false)

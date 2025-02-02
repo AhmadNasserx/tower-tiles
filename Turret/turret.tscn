@@ -1,17 +1,29 @@
-[gd_scene load_steps=3 format=3 uid="uid://bvpv2p1tllxwo"]
+[gd_scene load_steps=5 format=3 uid="uid://bvpv2p1tllxwo"]
 
 [ext_resource type="PackedScene" uid="uid://c2v07uonlsioa" path="res://assets/Turret/turret.glb" id="1_ktyvo"]
+[ext_resource type="Script" path="res://Turret/turret.gd" id="1_qlaio"]
+[ext_resource type="PackedScene" uid="uid://d01kbouh5aw11" path="res://Turret/projectile.tscn" id="2_uf1fy"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0rd57"]
 albedo_color = Color(0.0588235, 0.0705882, 0.105882, 1)
 
 [node name="turret" type="Node3D"]
+script = ExtResource("1_qlaio")
+projectile = ExtResource("2_uf1fy")
 
 [node name="base" type="CSGCylinder3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.08761)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.118299)
 radius = 2.5
 height = 0.5
 material = SubResource("StandardMaterial3D_0rd57")
 
 [node name="turret" parent="base" instance=ExtResource("1_ktyvo")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.08761)
+transform = Transform3D(-0.997425, 0, -0.0717237, 0, 1, 0, 0.0717237, 0, -0.997425, 0.928735, 0, -0.835203)
+
+[node name="Marker3D" type="Marker3D" parent="base/turret"]
+transform = Transform3D(-0.997425, 0, 0.0717237, 0, 1, 0, -0.0717237, 0, -0.997425, 1.21079, 1.73975, -2.69177)
+
+[node name="Timer" type="Timer" parent="."]
+autostart = true
+
+[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]

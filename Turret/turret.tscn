@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3 uid="uid://bvpv2p1tllxwo"]
+
+[ext_resource type="PackedScene" uid="uid://c2v07uonlsioa" path="res://assets/Turret/turret.glb" id="1_ktyvo"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0rd57"]
+albedo_color = Color(0.0588235, 0.0705882, 0.105882, 1)
+
+[node name="turret" type="Node3D"]
+
+[node name="base" type="CSGCylinder3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.08761)
+radius = 2.5
+height = 0.5
+material = SubResource("StandardMaterial3D_0rd57")
+
+[node name="turret" parent="base" instance=ExtResource("1_ktyvo")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.08761)

@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://crisr8irutf5t"]
+
+[ext_resource type="PackedScene" uid="uid://ckvnxmjjhqcen" path="res://assets/towers/tower.glb" id="1_jvgnf"]
+
+[node name="Tower" type="Node3D"]
+
+[node name="tower" parent="." instance=ExtResource("1_jvgnf")]
+transform = Transform3D(1.5, 0, 0, 0, 1, 0, 0, 0, 1.5, 0, 0, 0)

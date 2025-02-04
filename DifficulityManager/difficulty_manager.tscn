@@ -1,16 +1,25 @@
-[gd_scene load_steps=3 format=3 uid="uid://cgafixcc602mv"]
+[gd_scene load_steps=4 format=3 uid="uid://cgafixcc602mv"]
 
 [ext_resource type="Script" path="res://DifficulityManager/difficulty_manager.gd" id="1_hnhqq"]
 
 [sub_resource type="Curve" id="Curve_ysx63"]
-min_value = 0.25
+min_value = 0.5
 max_value = 2.0
-_data = [Vector2(0, 2), 0.0, -1.97034, 0, 1, Vector2(0.88817, 0.25), -1.97034, 0.0, 1, 0]
+_data = [Vector2(0, 2), 0.0, -1.44398, 0, 1, Vector2(1, 0.556017), -1.44398, 0.0, 1, 0]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_7xj0l"]
+min_value = 10.0
+max_value = 150.0
+_data = [Vector2(0.00802139, 10), 0.0, 142.283, 0, 1, Vector2(0.991979, 150), 142.283, 0.0, 1, 0]
 point_count = 2
 
 [node name="DifficultyManager" type="Node"]
 script = ExtResource("1_hnhqq")
 spawn_time_curve = SubResource("Curve_ysx63")
+enemy_health_curve = SubResource("Curve_7xj0l")
 
 [node name="Timer" type="Timer" parent="."]
 one_shot = true
+
+[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]

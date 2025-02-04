@@ -8,6 +8,7 @@ extends Node3D
 var enemy_path: Path3D
 var target: PathFollow3D
 
+
 func _process(delta: float) -> void:
 	target = find_best_target()
 	

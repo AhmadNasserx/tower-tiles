@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://du1sdem441ohs"]
+[gd_scene load_steps=4 format=3 uid="uid://du1sdem441ohs"]
 
 [ext_resource type="Script" path="res://UserInterface/victory_layer.gd" id="1_6yf4j"]
+[ext_resource type="Texture2D" uid="uid://7s4ftqu3kme0" path="res://assets/star.png" id="2_ldtwk"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_qdye7"]
 font_size = 96
@@ -36,6 +37,35 @@ text = "Victory!"
 label_settings = SubResource("LabelSettings_qdye7")
 horizontal_alignment = 1
 
+[node name="StarContainer" type="HBoxContainer" parent="CenterContainer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Star" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/StarContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(128, 128)
+layout_mode = 2
+texture = ExtResource("2_ldtwk")
+expand_mode = 2
+stretch_mode = 5
+
+[node name="Star2" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/StarContainer"]
+unique_name_in_owner = true
+modulate = Color(0, 0, 0, 1)
+custom_minimum_size = Vector2(128, 128)
+layout_mode = 2
+texture = ExtResource("2_ldtwk")
+expand_mode = 2
+stretch_mode = 5
+
+[node name="Star3" type="TextureRect" parent="CenterContainer/PanelContainer/VBoxContainer/StarContainer"]
+unique_name_in_owner = true
+modulate = Color(0, 0, 0, 1)
+custom_minimum_size = Vector2(128, 128)
+layout_mode = 2
+texture = ExtResource("2_ldtwk")
+expand_mode = 2
+stretch_mode = 5
+
 [node name="HBoxContainer" type="HBoxContainer" parent="CenterContainer/PanelContainer/VBoxContainer"]
 layout_mode = 2
 
@@ -50,6 +80,23 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 32
 text = "Quit"
+
+[node name="SurvivedLabel" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Survived + 1"
+
+[node name="FullHealthLabel" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Full Health + 1"
+
+[node name="MoneyLabel" type="Label" parent="CenterContainer/PanelContainer/VBoxContainer"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Money Money Money + 1"
 
 [connection signal="pressed" from="CenterContainer/PanelContainer/VBoxContainer/HBoxContainer/retryButton" to="." method="_on_retry_button_pressed"]
 [connection signal="pressed" from="CenterContainer/PanelContainer/VBoxContainer/HBoxContainer/QuitButton" to="." method="_on_quit_button_pressed"]

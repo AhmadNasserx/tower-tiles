@@ -45,6 +45,7 @@ _data = {
 }
 
 [node name="turret" type="Node3D"]
+transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, 0, 0, 0)
 script = ExtResource("1_qlaio")
 projectile = ExtResource("2_uf1fy")
 

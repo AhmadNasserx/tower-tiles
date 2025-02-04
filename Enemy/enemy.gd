@@ -6,7 +6,8 @@ extends PathFollow3D
 
 @onready var base = get_tree().get_first_node_in_group("base")
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
-@onready var damage_hilight: MeshInstance3D = $DamageHilight
+@onready var damage_hilight: MeshInstance3D = %Hightlight
+
 @onready var bank  = get_tree().get_first_node_in_group("bank")
 
 var current_health: int:

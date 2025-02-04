@@ -3,6 +3,7 @@ extends Node3D
 @export var turret_range := 10.0
 @export var projectile: PackedScene
 @onready var marker_3d: Marker3D = $base/turret/Marker3D
+@onready var animation_player: AnimationPlayer = $AnimationPlayer
 
 var enemy_path: Path3D
 var target: PathFollow3D
@@ -22,6 +23,7 @@ func _on_timer_timeout() -> void:
 
 
 func shoot():
+	animation_player.play("fire")
 	var shot = projectile.instantiate()
 	add_child(shot)
 	shot.global_position = marker_3d.global_position

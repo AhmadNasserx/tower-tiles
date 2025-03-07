@@ -3,12 +3,12 @@
 [ext_resource type="MeshLibrary" uid="uid://cpq7e5xnbg6lt" path="res://MeshLibraries/SpaceLibrary.tres" id="1_eswxn"]
 [ext_resource type="PackedScene" uid="uid://bmckmricwa02j" path="res://RayPickerCamera/ray_picker_camera.tscn" id="1_k1os8"]
 [ext_resource type="PackedScene" uid="uid://dme6fed7i15f8" path="res://Enemy/enemy.tscn" id="2_h8q3e"]
-[ext_resource type="Script" path="res://enemy_path.gd" id="3_0xs0x"]
+[ext_resource type="Script" uid="uid://ci5unfgys7af1" path="res://enemy_path.gd" id="3_0xs0x"]
 [ext_resource type="PackedScene" uid="uid://bwxx5epslm34k" path="res://Base/base.tscn" id="3_qfv6b"]
-[ext_resource type="Script" path="res://turret_manager.gd" id="5_fwrpv"]
+[ext_resource type="Script" uid="uid://b0bhyk13jne66" path="res://turret_manager.gd" id="5_fwrpv"]
 [ext_resource type="PackedScene" uid="uid://bvpv2p1tllxwo" path="res://Turret/turret.tscn" id="6_555ld"]
 [ext_resource type="FontFile" uid="uid://dido8tx0yfvo8" path="res://assets/Asap/static/Asap-Bold.ttf" id="8_2ve04"]
-[ext_resource type="Script" path="res://bank.gd" id="8_i42lf"]
+[ext_resource type="Script" uid="uid://dac0hj0tmtije" path="res://bank.gd" id="8_i42lf"]
 [ext_resource type="PackedScene" uid="uid://cgafixcc602mv" path="res://DifficulityManager/difficulty_manager.tscn" id="9_h0t0t"]
 [ext_resource type="PackedScene" uid="uid://du1sdem441ohs" path="res://UserInterface/victory_layer.tscn" id="10_w5m5m"]
 
@@ -89,6 +89,7 @@ path_interval_type = 0
 path_interval = 0.5
 path_simplify_angle = 0.0
 path_rotation = 2
+path_rotation_accurate = false
 path_local = true
 path_continuous_u = true
 path_u_distance = 1.0
@@ -103,6 +104,7 @@ path_interval_type = 0
 path_interval = 0.5
 path_simplify_angle = 0.0
 path_rotation = 2
+path_rotation_accurate = false
 path_local = true
 path_continuous_u = true
 path_u_distance = 1.0
@@ -116,6 +118,7 @@ path_interval_type = 0
 path_interval = 0.5
 path_simplify_angle = 0.0
 path_rotation = 2
+path_rotation_accurate = false
 path_local = true
 path_continuous_u = true
 path_u_distance = 1.0

@@ -1,6 +1,6 @@
 [gd_scene load_steps=10 format=4 uid="uid://dme6fed7i15f8"]
 
-[ext_resource type="Script" path="res://Enemy/enemy.gd" id="1_ehrti"]
+[ext_resource type="Script" uid="uid://u5pvya28gmtn" path="res://Enemy/enemy.gd" id="1_ehrti"]
 [ext_resource type="PackedScene" uid="uid://bs0yapn3cyekh" path="res://assets/Barbarian.glb" id="2_xc527"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qvqoq"]
@@ -117,8 +117,8 @@ tracks/0/keys = {
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_047et"]
 _data = {
-"RESET": SubResource("Animation_04w2o"),
-"TakeDamage": SubResource("Animation_h2ry0")
+&"RESET": SubResource("Animation_04w2o"),
+&"TakeDamage": SubResource("Animation_h2ry0")
 }
 
 [node name="Enemy" type="PathFollow3D"]
@@ -169,7 +169,7 @@ shape = SubResource("CapsuleShape3D_wjkiw")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 libraries = {
-"": SubResource("AnimationLibrary_047et")
+&"": SubResource("AnimationLibrary_047et")
 }
 
 [editable path="Barbarian"]

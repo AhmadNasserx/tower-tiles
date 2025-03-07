@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://bwxx5epslm34k"]
 
-[ext_resource type="Script" path="res://Base/base.gd" id="1_htor5"]
+[ext_resource type="Script" uid="uid://dlt500funvwb1" path="res://Base/base.gd" id="1_htor5"]
 [ext_resource type="PackedScene" uid="uid://crisr8irutf5t" path="res://Tower/tower.tscn" id="2_dle8m"]
 [ext_resource type="FontFile" uid="uid://dido8tx0yfvo8" path="res://assets/Asap/static/Asap-Bold.ttf" id="2_p4yqo"]
 

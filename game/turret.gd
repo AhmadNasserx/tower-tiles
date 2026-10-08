@@ -143,7 +143,7 @@ func _build() -> void:
 	add_child(_turn)
 	_weapon = Node3D.new()
 	_turn.add_child(_weapon)
-	const WS := 0.75 # weapons sit a bit smaller, in front of their kitten
+	const WS := 0.85 # weapons sit just in front of their kitten
 	if st.weapon != "":
 		var w := _piece(st.weapon)
 		w.rotation.y = PI
@@ -157,14 +157,14 @@ func _build() -> void:
 	match type:
 		"hiss":
 			# a spooky black cat, all puffed up
-			cat = PetRig.create("cat", 0.8, st.tint)
+			cat = PetRig.create("cat", 0.5, st.tint)
 			_turn.add_child(cat)
 		"fatcat":
-			cat = PetRig.create("lion", 0.95)
+			cat = PetRig.create("lion", 0.62)
 			_turn.add_child(cat)
 			cat.play("idle", 0.4)
 		_:
-			cat = PetRig.create(st.pet, 0.72, st.tint)
+			cat = PetRig.create(st.pet, 0.45, st.tint)
 			cat.position = Vector3(0, 0, 0.16) * TS
 			_turn.add_child(cat)
 	_rebuild_stack()
@@ -202,11 +202,11 @@ func _rebuild_stack() -> void:
 		"fatcat":
 			pieces = ["tower-round-base"]
 		_:
+			# always a proper castle tower: battlements on top, one more floor per level
 			pieces = [st.bottom]
-			if level >= 2:
-				pieces.append("tower-round-middle-a")
-			if level >= 1:
-				pieces.append("tower-round-top-a")
+			for i in mini(level, 2):
+				pieces.append("tower-round-middle-a" if i == 0 else "tower-round-middle-b")
+			pieces.append("tower-round-top-a")
 	var y := 0.0
 	var heights := {"tower-round-base": 0.21, "tower-round-top-a": 0.5}
 	for p in pieces:
@@ -217,12 +217,12 @@ func _rebuild_stack() -> void:
 		Toon.apply(n, true, true)
 		var h: float = heights.get(p, 0.6) * TS
 		# kittens stand inside the battlements, not on top of them
-		y += h if p != "tower-round-top-a" else 0.18 * TS
+		y += h if p != "tower-round-top-a" else 0.3 * TS
 	_top_y = y
 	if type == "fatcat":
 		_add_coin_pile()
 		_turn.position = Vector3(0, y, 0)
-		cat.base_scale = 0.75 + level * 0.1
+		cat.base_scale = 0.55 + level * 0.07
 		cat.scale = Vector3.ONE * cat.base_scale
 	else:
 		_turn.position = Vector3(0, y, 0)

@@ -7,8 +7,8 @@ const POOL_SIZE := 14
 const NAMES := [
 	"boss", "build", "cash", "click", "coin", "combo", "crit", "defeat", "die", "die2",
 	"error", "heal", "hiss", "hit", "hover", "life_lost", "meow", "meow2", "perk", "pulse",
-	"sell", "shoot_fish", "shoot_yarn", "slam", "snore", "splash", "tick", "upgrade",
-	"victory", "wave_clear", "wave_start", "yip", "yowl", "zap", "zoomies",
+	"sell", "shoot_fish", "shoot_yarn", "slam", "splash", "tick", "upgrade",
+	"victory", "wave_clear", "wave_start", "yowl", "zap", "zoomies",
 ]
 const MUSIC := {
 	"menu": preload("res://audio/music/menu.ogg"),

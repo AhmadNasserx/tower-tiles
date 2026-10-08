@@ -9,14 +9,12 @@ const BASE_GOLD := 180
 const SELL_REFUND := 0.7
 
 # ------------------------------------------------------------------ palette
-const C_INK := Color("2a1f33")
 const C_CREAM := Color("fff4e0")
 const C_ORANGE := Color("ff9f43")
 const C_PINK := Color("ff7eb6")
 const C_GOLD := Color("ffd23f")
 const C_RED := Color("ff4d6d")
 const C_GREEN := Color("7bd389")
-const C_BLUE := Color("5dade2")
 const C_PURPLE := Color("a66cff")
 
 # ------------------------------------------------------------------ kittens
@@ -84,19 +82,19 @@ const TARGET_MODES := ["First", "Last", "Strong", "Close"]
 # ------------------------------------------------------------------ dogs
 const ENEMIES := {
 	"pup": {"name": "Pup", "hp": 26.0, "speed": 3.6, "armor": 0.0, "gold": 3, "lives": 1,
-		"model": "dog", "scale": 0.55, "tint": Color(1, 1, 1), "coat": Color("e09a4f"), "threat": 1.0, "interval": 0.55},
+		"model": "dog", "scale": 0.39, "tint": Color(1, 1, 1), "coat": Color("e09a4f"), "threat": 1.0, "interval": 0.55},
 	"hound": {"name": "Hound", "hp": 60.0, "speed": 2.8, "armor": 0.0, "gold": 5, "lives": 1,
-		"model": "dog", "scale": 0.78, "tint": Color(0.8, 0.62, 0.5), "coat": Color("a0643b"), "threat": 2.0, "interval": 0.8},
+		"model": "dog", "scale": 0.55, "tint": Color(0.8, 0.62, 0.5), "coat": Color("a0643b"), "threat": 2.0, "interval": 0.8},
 	"greyhound": {"name": "Fox", "hp": 40.0, "speed": 5.4, "armor": 0.0, "gold": 5, "lives": 1,
-		"model": "fox", "scale": 0.68, "tint": Color(1, 1, 1), "coat": Color("ff8a3d"), "threat": 2.0, "interval": 0.6},
+		"model": "fox", "scale": 0.48, "tint": Color(1, 1, 1), "coat": Color("ff8a3d"), "threat": 2.0, "interval": 0.6},
 	"poodle": {"name": "Nurse Bunny", "hp": 90.0, "speed": 2.5, "armor": 0.0, "gold": 9, "lives": 1,
-		"model": "bunny", "scale": 0.7, "tint": Color(1.25, 1.0, 1.15), "coat": Color("f59ac8"), "threat": 4.0, "interval": 1.2, "healer": true},
+		"model": "bunny", "scale": 0.49, "tint": Color(1.25, 1.0, 1.15), "coat": Color("f59ac8"), "threat": 4.0, "interval": 1.2, "healer": true},
 	"bulldog": {"name": "Boar", "hp": 180.0, "speed": 1.7, "armor": 3.0, "gold": 11, "lives": 2,
-		"model": "hog", "scale": 0.9, "tint": Color(1, 1, 1), "coat": Color("c46a4a"), "threat": 5.0, "interval": 1.6},
+		"model": "hog", "scale": 0.63, "tint": Color(1, 1, 1), "coat": Color("c46a4a"), "threat": 5.0, "interval": 1.6},
 	"alpha": {"name": "Alpha Hound", "hp": 620.0, "speed": 1.5, "armor": 3.0, "gold": 120, "lives": 3,
-		"model": "dog", "scale": 1.35, "tint": Color(0.5, 0.46, 0.62), "coat": Color("4b4e5c"), "threat": 0.0, "interval": 2.0, "boss": true},
+		"model": "dog", "scale": 0.94, "tint": Color(0.5, 0.46, 0.62), "coat": Color("4b4e5c"), "threat": 0.0, "interval": 2.0, "boss": true},
 	"vacuum": {"name": "Big Ellie", "hp": 1700.0, "speed": 1.1, "armor": 5.0, "gold": 220, "lives": 5,
-		"model": "elephant", "scale": 1.3, "tint": Color(1, 1, 1), "coat": Color("a9b0d6"), "threat": 0.0, "interval": 2.0, "boss": true},
+		"model": "elephant", "scale": 0.91, "tint": Color(1, 1, 1), "coat": Color("a9b0d6"), "threat": 0.0, "interval": 2.0, "boss": true},
 }
 const UNLOCK_WAVE := {"pup": 1, "hound": 2, "greyhound": 4, "bulldog": 6, "poodle": 8}
 
@@ -215,13 +213,6 @@ const MAPS := [
 		],
 	},
 ]
-
-
-static func map_index(id: String) -> int:
-	for i in MAPS.size():
-		if MAPS[i].id == id:
-			return i
-	return 0
 
 
 # ------------------------------------------------------------------ waves

@@ -156,7 +156,7 @@ func build() -> ArrayMesh:
 	if _empty:
 		return ArrayMesh.new()
 	var mesh := _st.commit()
-	mesh.surface_set_material(0, material())
+	mesh.surface_set_material(0, Toon.vertex_material())
 	return mesh
 
 

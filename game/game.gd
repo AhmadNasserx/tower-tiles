@@ -76,11 +76,12 @@ var _hitstop := 0.0
 var _hitstop_scale := 1.0
 var _last_real := 0.0
 
-var _hover_tile: MeshInstance3D
+var _hover_tile: Node3D
+var _hover_mat: StandardMaterial3D
 var _range_disc: MeshInstance3D
 var _range_ring: MeshInstance3D
 var _ghost: Node3D
-var _ghost_post: MeshInstance3D
+var _ghost_mat: StandardMaterial3D
 var _paw_marker: MeshInstance3D
 var _demo_t := 0.0
 
@@ -104,6 +105,7 @@ func _ready() -> void:
 
 
 func _build_world() -> void:
+	Toon.outlines_enabled = Save.settings.quality != "low"
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
@@ -151,7 +153,7 @@ func _build_world() -> void:
 	overlay = Overlay.new()
 	overlay.game = self
 	overlay.camera = camera
-	overlay.font = preload("res://assets/fonts/Asap-Black.ttf")
+	overlay.font = preload("res://assets/fonts/LilitaOne-Regular.ttf")
 	layer.add_child(overlay)
 	overlay.coin_arrived.connect(_on_coin_arrived)
 	fx.overlay = overlay
@@ -164,15 +166,13 @@ func _build_world() -> void:
 
 
 func _build_indicators() -> void:
-	_hover_tile = MeshInstance3D.new()
-	var hk := MeshKit.new()
-	var s := GameData.TILE * 0.47
-	for i in 4:
-		var a := i * 90.0
-		hk.box(Vector3(sin(deg_to_rad(a)) * s, 0, cos(deg_to_rad(a)) * s), Vector3(GameData.TILE * 0.98, 0.06, 0.12), Color(1, 1, 1), Vector3(0, a, 0))
-	_hover_tile.mesh = hk.build_unshaded()
-	_hover_tile.material_override = MeshKit.color_material(Color(1, 1, 1, 0.9), true)
-	_hover_tile.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Kenney's corner-bracket selection marker
+	_hover_tile = load("res://assets/models/td/selection-a.glb").instantiate()
+	_hover_tile.scale = Vector3.ONE * Level.KIT
+	_hover_mat = MeshKit.color_material(Color(1, 1, 1, 0.9), true)
+	for mi in _hover_tile.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = _hover_mat
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_hover_tile.visible = false
 	add_child(_hover_tile)
 
@@ -202,9 +202,7 @@ func _build_indicators() -> void:
 	_ghost = Node3D.new()
 	_ghost.visible = false
 	add_child(_ghost)
-	_ghost_post = MeshInstance3D.new()
-	_ghost_post.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_ghost.add_child(_ghost_post)
+	_ghost_mat = MeshKit.color_material(Color(1, 1, 1, 0.45), true)
 
 	_paw_marker = MeshInstance3D.new()
 	var pk := MeshKit.new()
@@ -370,11 +368,11 @@ func _wave_flavor() -> String:
 			newest = t
 	match newest:
 		"hound": return "Hounds incoming! Sturdier than pups."
-		"greyhound": return "Greyhounds! They are FAST."
-		"bulldog": return "Bulldogs! Armored. Big hits work best."
-		"poodle": return "Poodles heal their friends. Focus them!"
-	var lines := ["Here they come!", "Woof woof woof.", "Protect the nap spot!", "Stay pawsitive!",
-		"Hiss-teria incoming.", "Fur real now.", "The dogs smell treats.", "Claws out!"]
+		"greyhound": return "Foxes! They are FAST."
+		"bulldog": return "Boars! Armored. Big hits work best."
+		"poodle": return "Nurse Bunnies heal their friends. Focus them!"
+	var lines := ["Here they come!", "Woof woof squeak.", "Protect the nap spot!", "Stay pawsitive!",
+		"Hiss-teria incoming.", "Fur real now.", "The pack smells treats.", "Claws out!"]
 	return lines[wave % lines.size()]
 
 
@@ -481,7 +479,7 @@ func on_enemy_killed(e: Enemy) -> void:
 	overlay.fly_coins(e.global_position + Vector3(0, 0.6, 0), g, 1 if not e.is_boss else 12)
 	fx.coins(e.global_position)
 	if not demo:
-		Sfx.play("die" if randf() < 0.5 else "die2", 1.0 / sqrt(e.size), 0.12)
+		Sfx.play("die" if randf() < 0.5 else "die2", 1.0 / sqrt(e.size * 1.5), 0.12)
 	if e.is_boss:
 		boss = null
 		if not demo:
@@ -590,11 +588,30 @@ func set_build_type(type: String) -> void:
 		build_type = type
 		mode = "build"
 		select(null)
-		_ghost_post.mesh = Turret._post_mesh(type, 0)
-		_ghost_post.material_override = MeshKit.color_material(Color(1, 1, 1, 0.45), true)
+		_set_ghost(type)
 	_touch_armed = Vector2i(-99, -99)
 	build_mode_changed.emit(build_type)
 	Sfx.play("click")
+
+
+## A see-through preview of the kitten's tower under the cursor.
+func _set_ghost(type: String) -> void:
+	for c in _ghost.get_children():
+		c.queue_free()
+	var st: Dictionary = Turret.STYLE[type]
+	var pieces: Array = ["tower-round-base"] if type == "fatcat" else [st.bottom]
+	if st.weapon != "":
+		pieces.append(st.weapon)
+	var y := 0.0
+	for p in pieces:
+		var n := Turret._piece(p)
+		n.scale = Vector3.ONE * Turret.TS
+		n.position.y = y
+		_ghost.add_child(n)
+		y += 0.6 * Turret.TS
+		for mi in n.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_override = _ghost_mat
+			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func can_build(c: Vector2i) -> bool:
@@ -796,7 +813,8 @@ func _make_giant_paw() -> Node3D:
 		k.sphere(Vector3(sin(a) * 1.7, 0.55, -cos(a) * 1.5 - 0.3), Vector3(0.62, 0.6, 0.7), fur, Vector3.ZERO, 10)
 		k.sphere(Vector3(sin(a) * 1.75, 0.0, -cos(a) * 1.55 - 0.3), Vector3(0.36, 0.08, 0.42), bean, Vector3.ZERO, 8)
 	k.sphere(Vector3(0, 0.0, 0.3), Vector3(1.0, 0.1, 0.85), bean, Vector3.ZERO, 10)
-	MeshKit.instance(k.build(), n)
+	var mi := MeshKit.instance(k.build(), n)
+	Toon.apply(mi, true, true)
 	return n
 
 
@@ -965,7 +983,9 @@ func _update_hover() -> void:
 		_ghost.visible = false
 		if turrets.has(c):
 			col = Color(GameData.C_GOLD, pulse)
-	(_hover_tile.material_override as StandardMaterial3D).albedo_color = col
+	_hover_mat.albedo_color = col
+	var bob := 1.0 + sin(Time.get_ticks_msec() * 0.008) * 0.04
+	_hover_tile.scale = Vector3(bob, 1.0, bob) * Level.KIT
 
 
 func _unhandled_input(event: InputEvent) -> void:

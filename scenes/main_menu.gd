@@ -31,10 +31,10 @@ func _ready() -> void:
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(ui)
 
-	# soft dark gradient on the left so the menu text pops
+	# soft warm shade on the left so the menu pops off the diorama
 	var g := Gradient.new()
-	g.set_color(0, Color(GameData.C_INK, 0.85))
-	g.set_color(1, Color(GameData.C_INK, 0.0))
+	g.set_color(0, Color(0.17, 0.1, 0.06, 0.6))
+	g.set_color(1, Color(0.17, 0.1, 0.06, 0.0))
 	var gt := GradientTexture2D.new()
 	gt.gradient = g
 	gt.fill_to = Vector2(1, 0)
@@ -44,7 +44,7 @@ func _ready() -> void:
 	shade.texture = gt
 	shade.stretch_mode = TextureRect.STRETCH_SCALE
 	shade.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	shade.custom_minimum_size.x = 640
+	shade.custom_minimum_size.x = 560
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(shade)
 
@@ -56,52 +56,58 @@ func _ready() -> void:
 
 
 func _build_title() -> void:
-	var box := UIKit.vbox(0)
-	box.position = Vector2(56, 40)
+	var box := UIKit.vbox(-6)
+	box.position = Vector2(48, 26)
 	ui.add_child(box)
 	var row := UIKit.hbox(0)
 	box.add_child(row)
 	for ch in "TOWER TILES":
-		var l := UIKit.label(ch, 76, GameData.C_CREAM, 16, true)
+		var l := UIKit.label(ch, 88 if ch != " " else 50, UIKit.CREAM, 18, true)
+		l.label_settings.shadow_size = 1
+		l.label_settings.shadow_offset = Vector2(0, 7)
+		l.label_settings.shadow_color = Color(0.17, 0.1, 0.06, 0.7)
 		row.add_child(l)
 		_title_letters.append(l)
-	var sub := UIKit.hbox(10)
+	var sub := UIKit.ribbon("NINE LIVES", 34, 330)
+	sub.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	box.add_child(sub)
-	sub.add_child(UIKit.icon("cat", GameData.C_ORANGE, 44))
-	sub.add_child(UIKit.label("NINE LIVES DEFENSE", 30, GameData.C_ORANGE, 10, true))
 	for i in _title_letters.size():
 		UIKit.pop_in(_title_letters[i], 0.05 * i)
+	UIKit.pop_in(sub, 0.6)
 
 
 func _build_menu() -> void:
-	_menu_col = UIKit.vbox(14)
-	_menu_col.position = Vector2(64, 250)
+	_menu_col = UIKit.vbox(12)
+	_menu_col.position = Vector2(60, 270)
 	ui.add_child(_menu_col)
-	var entries := [["Play", _show_maps], ["Cat Tree", _show_shop], ["Settings", _show_settings]]
+	var entries := [["Play", _show_maps, "green", "play"], ["Cat Tree", _show_shop, "yellow", "fish"], ["Settings", _show_settings, "yellow", "gear"]]
 	if not OS.has_feature("web"):
-		entries.append(["Quit", func(): get_tree().quit()])
+		entries.append(["Quit", func(): get_tree().quit(), "red", ""])
 	var i := 0
 	for e in entries:
-		var b := UIKit.button(e[0], e[1], 28)
-		b.custom_minimum_size = Vector2(280, 64)
-		if i == 0:
-			b.add_theme_stylebox_override("normal", UIKit.panel_style(GameData.C_ORANGE, GameData.C_INK, 16, 3))
-			b.add_theme_stylebox_override("hover", UIKit.panel_style(GameData.C_ORANGE.lightened(0.2), GameData.C_INK, 16, 3))
+		var b := UIKit.button(e[0], e[1], 30 if i == 0 else 26, e[2], e[3])
+		b.custom_minimum_size = Vector2(300, 74 if i == 0 else 62)
 		_menu_col.add_child(b)
 		UIKit.pop_in(b, 0.4 + i * 0.08)
 		i += 1
+	# your cat says hi
+	var hero := UIKit.portrait("hero", 150)
+	hero.position = Vector2(390, 300)
+	ui.add_child(hero)
+	UIKit.pop_in(hero, 0.8)
 
 
 func _build_fish_counter() -> void:
 	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UIKit.wood())
 	var h := UIKit.hbox(8)
 	p.add_child(h)
-	h.add_child(UIKit.icon("fish", GameData.C_BLUE, 36))
-	_fish_label = UIKit.label(str(Save.fish), 28, GameData.C_CREAM, 0, true)
+	h.add_child(UIKit.icon("fish", Color.WHITE, 40))
+	_fish_label = UIKit.label(str(Save.fish), 30, UIKit.CREAM, 8, true)
 	h.add_child(_fish_label)
 	p.tooltip_text = "Fish: earned by surviving waves. Spend them in the Cat Tree."
 	ui.add_child(p)
-	p.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
+	p.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT, Control.PRESET_MODE_MINSIZE, 14)
 
 
 func _set_fish(f: int, punch := false) -> void:
@@ -113,9 +119,10 @@ func _set_fish(f: int, punch := false) -> void:
 
 
 func _build_footer() -> void:
-	var l := UIKit.label("Runs: %d   Dogs bonked: %d   ·   Made with Godot %s" % [Save.stats.runs, Save.stats.dogs_bonked, "%d.%d" % [Engine.get_version_info().major, Engine.get_version_info().minor]], 14, Color(1, 1, 1, 0.6), 4)
+	var v := Engine.get_version_info()
+	var l := UIKit.label("Runs: %d   Critters bonked: %d   ·   Art: Kenney (CC0)   ·   Made with Godot %d.%d" % [Save.stats.runs, Save.stats.dogs_bonked, v.major, v.minor], 15, UIKit.CREAM, 6)
 	ui.add_child(l)
-	l.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 16)
+	l.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 14)
 
 
 func _process(delta: float) -> void:
@@ -128,23 +135,34 @@ func _process(delta: float) -> void:
 
 
 # ------------------------------------------------------------------ panels
-func _open_panel(min_width := 0.0) -> VBoxContainer:
+func _open_panel(title: String, sub := "", min_width := 0.0) -> VBoxContainer:
 	_close_panel()
 	_content = Control.new()
 	_content.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ui.add_child(_content)
-	UIKit.dim(_content, 0.5).gui_input.connect(func(ev):
+	UIKit.dim(_content, 0.45).gui_input.connect(func(ev):
 		if ev is InputEventMouseButton and ev.pressed:
 			_close_panel())
 	var cc := UIKit.center_container(_content)
 	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var outer := UIKit.vbox(-18)
+	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cc.add_child(outer)
+	var rb := UIKit.ribbon(title, 40, maxf(min_width * 0.7, 400))
+	rb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	rb.z_index = 1
+	outer.add_child(rb)
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UIKit.panel_style(Color(GameData.C_INK, 0.96), GameData.C_ORANGE, 22, 4))
+	panel.add_theme_stylebox_override("panel", UIKit.sbox("panel_brown.png", 22, Vector4(30, 34, 30, 26)))
 	panel.custom_minimum_size.x = min_width
-	cc.add_child(panel)
+	outer.add_child(panel)
 	var v := UIKit.vbox(14)
 	panel.add_child(v)
-	UIKit.pop_in(panel)
+	if sub != "":
+		var s := UIKit.label(sub, 17, UIKit.INK_SOFT)
+		s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(s)
+	UIKit.pop_in(outer)
 	return v
 
 
@@ -159,24 +177,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		_close_panel()
 
 
-func _header(v: VBoxContainer, title: String, sub: String) -> void:
-	var t := UIKit.label(title, 40, GameData.C_ORANGE, 0, true)
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(t)
-	if sub != "":
-		var s := UIKit.label(sub, 17, Color("b9adc0"))
-		s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(s)
-
-
 func _show_maps() -> void:
-	var v := _open_panel()
-	_header(v, "Choose a Map", "Clear a map to unlock the next one. Three stars = no lives lost.")
-	var row := UIKit.hbox(16)
+	var v := _open_panel("CHOOSE A MAP", "Clear a map to unlock the next. Three stars = no lives lost.")
+	var row := UIKit.hbox(14)
 	v.add_child(row)
 	for i in GameData.MAPS.size():
 		row.add_child(_map_card(i))
-	var back := UIKit.button("Back", _close_panel, 18)
+	var back := UIKit.button("Back", _close_panel, 20, "yellow")
+	back.custom_minimum_size.x = 160
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(back)
 
@@ -186,25 +194,25 @@ func _map_card(i: int) -> Control:
 	var unlocked := Save.map_unlocked(i)
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(250, 300)
-	var border := GameData.C_GREEN if unlocked else Color("6b5d73")
-	b.add_theme_stylebox_override("normal", UIKit.panel_style(Color("3a2b45"), border, 18, 3))
-	b.add_theme_stylebox_override("hover", UIKit.panel_style(Color("4a3b57"), GameData.C_ORANGE, 18, 4))
-	b.add_theme_stylebox_override("pressed", UIKit.panel_style(Color("2a1f33"), GameData.C_ORANGE, 18, 4))
-	b.add_theme_stylebox_override("disabled", UIKit.panel_style(Color("2a1f33"), Color("4a3b57"), 18, 3))
+	b.add_theme_stylebox_override("normal", UIKit.sbox("sq_grey.png", 20, Vector4(8, 8, 8, 8), Color(1.08, 1.06, 1.0)))
+	b.add_theme_stylebox_override("hover", UIKit.sbox("sq_yellow.png", 20, Vector4(8, 8, 8, 8)))
+	b.add_theme_stylebox_override("pressed", UIKit.sbox("sq_yellow_pressed.png", 20, Vector4(8, 8, 8, 8)))
+	b.add_theme_stylebox_override("disabled", UIKit.sbox("sq_grey.png", 20, Vector4(8, 8, 8, 8), Color(0.7, 0.66, 0.66)))
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	b.disabled = not unlocked
 	var v := UIKit.vbox(8)
 	v.set_anchors_preset(Control.PRESET_FULL_RECT)
 	v.offset_left = 14
 	v.offset_right = -14
 	v.offset_top = 14
-	v.offset_bottom = -14
+	v.offset_bottom = -20
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(v)
 	v.add_child(_map_thumb(m, unlocked))
-	var name_l := UIKit.label(m.name, 24, GameData.C_CREAM if unlocked else Color("8a7d94"), 0, true)
+	var name_l := UIKit.label(m.name, 26, UIKit.INK if unlocked else UIKit.INK_SOFT, 0, true)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(name_l)
-	var desc := UIKit.label(m.desc if unlocked else "Clear %s to unlock." % GameData.MAPS[i - 1].name, 15, Color("b9adc0"))
+	var desc := UIKit.label(m.desc if unlocked else "Clear %s to unlock." % GameData.MAPS[i - 1].name, 15, UIKit.INK_SOFT)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(desc)
@@ -212,9 +220,9 @@ func _map_card(i: int) -> Control:
 	stars.alignment = BoxContainer.ALIGNMENT_CENTER
 	var got := int(Save.stars.get(m.id, 0))
 	for s in 3:
-		stars.add_child(UIKit.icon("star" if s < got else "star_empty", GameData.C_GOLD, 30))
+		stars.add_child(UIKit.icon("star" if s < got else "star_empty", Color.WHITE, 32))
 	v.add_child(stars)
-	var info := UIKit.label("Difficulty %.1fx   Best wave %d" % [m.difficulty, int(Save.best_wave.get(m.id, 0))], 14, Color("b9adc0"))
+	var info := UIKit.label("Difficulty %.1fx   ·   Best wave %d" % [m.difficulty, int(Save.best_wave.get(m.id, 0))], 14, UIKit.INK_SOFT)
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(info)
 	b.pressed.connect(func():
@@ -228,50 +236,50 @@ func _map_card(i: int) -> Control:
 ## A tiny drawn preview of the map grid.
 func _map_thumb(m: Dictionary, unlocked: bool) -> Control:
 	var c := Control.new()
-	c.custom_minimum_size = Vector2(220, 120)
+	c.custom_minimum_size = Vector2(220, 124)
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame := StyleBoxFlat.new()
+	frame.bg_color = Color("6b4426")
+	frame.set_corner_radius_all(8)
 	c.draw.connect(func():
 		var grid: Array = m.grid
 		var rows := grid.size()
 		var cols: int = grid[0].length()
-		var cell := minf(c.size.x / cols, c.size.y / rows)
+		var cell := minf((c.size.x - 8) / cols, (c.size.y - 8) / rows)
 		var off := (c.size - Vector2(cols, rows) * cell) * 0.5
+		c.draw_style_box(frame, Rect2(off - Vector2(4, 4), Vector2(cols, rows) * cell + Vector2(8, 8)))
 		for y in rows:
 			for x in cols:
 				var ch: String = grid[y][x]
-				var col: Color = m.grass[(x + y) % 2]
+				var col: Color = Color("8fd16a") if (x + y) % 2 == 0 else Color("83c45f")
 				match ch:
-					"#": col = m.road
+					"#": col = Color("f2c98a")
 					"S": col = Color("c0504d")
-					"C": col = GameData.C_PURPLE
+					"C": col = Color("a66cff")
 					"T": col = Color("3f8f4a")
 					"R": col = Color("9aa5b1")
 				if not unlocked:
-					col = Color(col.v * 0.4, col.v * 0.35, col.v * 0.45)
-				c.draw_rect(Rect2(off + Vector2(x, y) * cell, Vector2(cell - 1, cell - 1)), col)
-		if not unlocked:
-			var lk := c.size * 0.5
-			c.draw_circle(lk, 26, Color(GameData.C_INK, 0.8)))
+					col = Color(col.v * 0.55, col.v * 0.5, col.v * 0.45)
+				c.draw_rect(Rect2(off + Vector2(x, y) * cell, Vector2(cell, cell)), col))
 	if not unlocked:
-		var lock := UIKit.icon("lock", Color.WHITE, 36)
-		lock.position = Vector2(92, 42)
+		var lock := UIKit.icon("lock", Color.WHITE, 52)
+		lock.position = Vector2(84, 36)
 		c.add_child(lock)
 	return c
 
 
 func _show_shop() -> void:
-	var v := _open_panel(760)
-	_header(v, "The Cat Tree", "Permanent upgrades for every run. Earn fish by surviving waves.")
+	var v := _open_panel("THE CAT TREE", "", 780)
 	var fish_row := UIKit.hbox(8)
 	fish_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	fish_row.add_child(UIKit.icon("fish", GameData.C_BLUE, 30))
-	var fl := UIKit.label("%d fish" % Save.fish, 24, GameData.C_BLUE, 0, true)
-	fish_row.add_child(fl)
+	fish_row.add_child(UIKit.icon("fish", Color.WHITE, 36))
+	fish_row.add_child(UIKit.label("%d fish" % Save.fish, 28, Color("2f7fc1"), 0, true))
+	fish_row.add_child(UIKit.label("  ·  Permanent upgrades for every run", 16, UIKit.INK_SOFT))
 	v.add_child(fish_row)
 	var grid := GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
 	v.add_child(grid)
 	var i := 0
 	for id in GameData.META_ORDER:
@@ -284,10 +292,10 @@ func _show_shop() -> void:
 	var refund := UIKit.button("Refund all", func():
 		Save.refund_meta()
 		Sfx.play("sell")
-		_show_shop(), 16)
+		_show_shop(), 18, "red")
 	refund.tooltip_text = "Get every fish back and re-spec."
 	row.add_child(refund)
-	row.add_child(UIKit.button("Back", _close_panel, 18))
+	row.add_child(UIKit.button("Back", _close_panel, 20, "yellow"))
 	v.add_child(row)
 
 
@@ -297,45 +305,48 @@ func _meta_card(id: String) -> Control:
 	var maxed: bool = lvl >= d.max
 	var cost := 0 if maxed else GameData.meta_cost(id, lvl)
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", UIKit.panel_style(Color("3a2b45"), GameData.C_GOLD if maxed else Color("4a3b57"), 14, 3))
-	p.custom_minimum_size = Vector2(236, 0)
-	var v := UIKit.vbox(6)
+	p.add_theme_stylebox_override("panel", UIKit.sbox("sq_grey.png", 20, Vector4(12, 8, 12, 14), Color(1.08, 1.06, 1.0) if not maxed else Color(1.15, 1.08, 0.8)))
+	p.custom_minimum_size = Vector2(238, 0)
+	var v := UIKit.vbox(2)
 	p.add_child(v)
 	var top := UIKit.hbox(8)
 	v.add_child(top)
-	var col: Color = {"heart": GameData.C_RED, "coin": GameData.C_GOLD, "paw": GameData.C_ORANGE, "cat": GameData.C_ORANGE,
-		"bolt": GameData.C_PURPLE, "star": GameData.C_GOLD}.get(d.icon, GameData.C_CREAM)
-	top.add_child(UIKit.icon(d.icon, col, 34))
-	var names := UIKit.vbox(0)
-	names.add_child(UIKit.label(d.name, 18, GameData.C_CREAM, 0, true))
-	names.add_child(UIKit.label(d.desc, 13, Color("b9adc0")))
+	top.add_child(UIKit.icon(d.icon, Color.WHITE, 38))
+	var names := UIKit.vbox(-4)
+	names.add_child(UIKit.label(d.name, 18, UIKit.INK, 0, true))
+	names.add_child(UIKit.label(d.desc, 13, UIKit.INK_SOFT))
 	top.add_child(names)
-	var pips := UIKit.hbox(4)
+	var bottom := UIKit.hbox(6)
+	v.add_child(bottom)
+	var pips := UIKit.hbox(1)
+	pips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pips.alignment = BoxContainer.ALIGNMENT_BEGIN
 	for i in d.max:
-		var pip := ColorRect.new()
-		pip.custom_minimum_size = Vector2(18, 8)
-		pip.color = GameData.C_GOLD if i < lvl else Color("4a3b57")
-		pips.add_child(pip)
-	v.add_child(pips)
+		var st := UIKit.icon("star" if i < lvl else "star_empty", Color.WHITE, 18)
+		st.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pips.add_child(st)
+	bottom.add_child(pips)
 	var b: Button
 	if maxed:
-		b = UIKit.button("MAXED", func(): pass, 16)
+		b = UIKit.button("MAX", func(): pass, 16, "grey")
 		b.disabled = true
 	else:
-		b = UIKit.button("Buy  %d fish" % cost, func():
+		b = UIKit.button("%d" % cost, func():
 			if Save.buy_meta(id):
 				Sfx.play("upgrade")
 				Sfx.play("meow", 1.2, 0.1, -4.0)
 				_show_shop()
 			else:
-				Sfx.play("error"), 16)
+				Sfx.play("error"), 16, "green", "fish")
 		b.disabled = Save.fish < cost
-	v.add_child(b)
+		b.tooltip_text = "Buy for %d fish" % cost
+	b.custom_minimum_size.x = 96
+	bottom.add_child(b)
 	return p
 
 
 func _show_settings() -> void:
-	var v := _open_panel()
+	var v := _open_panel("SETTINGS")
 	var s := SettingsPanel.new()
 	v.add_child(s)
 	s.closed.connect(_close_panel)

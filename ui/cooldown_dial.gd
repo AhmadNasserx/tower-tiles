@@ -4,7 +4,7 @@ extends Control
 var fraction := 0.0
 var seconds := 0.0
 var active := false
-var _font: Font = preload("res://assets/fonts/Asap-Black.ttf")
+var _font: Font = preload("res://assets/fonts/LilitaOne-Regular.ttf")
 
 
 func _process(_delta: float) -> void:
@@ -24,9 +24,9 @@ func _draw() -> void:
 	for i in steps + 1:
 		var a := -PI / 2 + TAU * fraction * float(i) / steps
 		pts.append(c + Vector2(cos(a), sin(a)) * r)
-	draw_colored_polygon(pts, Color(0.16, 0.12, 0.2, 0.7))
+	draw_colored_polygon(pts, Color(0.17, 0.1, 0.06, 0.62))
 	var txt := str(ceili(seconds))
 	var fs := 26
 	var w := _font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_string_outline(_font, c + Vector2(-w * 0.5, 9), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color("2a1f33"))
+	draw_string_outline(_font, c + Vector2(-w * 0.5, 9), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color("2b1a10"))
 	draw_string(_font, c + Vector2(-w * 0.5, 9), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color("fff4e0"))

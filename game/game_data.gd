@@ -24,7 +24,7 @@ const C_PURPLE := Color("a66cff")
 const TURRETS := {
 	"yarn": {
 		"name": "Yarn Kitty", "cost": 60, "kind": "projectile", "key": "1",
-		"desc": "Bats yarn balls at dogs. Cheap, reliable, adorable.",
+		"desc": "Launches yarn balls with a tiny ballista. Cheap, reliable, adorable.",
 		"fur": Color("9aa5b1"), "accent": Color("ff5c8a"), "icon": "yarn",
 		"levels": [
 			{"dmg": 10.0, "rate": 1.3, "range": 6.5},
@@ -35,7 +35,7 @@ const TURRETS := {
 	},
 	"hiss": {
 		"name": "Hiss Box", "cost": 80, "kind": "pulse", "key": "2",
-		"desc": "Hisses in a ring, slowing every dog nearby. Max level stuns.",
+		"desc": "Hisses in a ring, slowing every critter nearby. Max level stuns.",
 		"fur": Color("3b3b48"), "accent": Color("7fd8ff"), "icon": "hiss",
 		"levels": [
 			{"dmg": 5.0, "rate": 0.7, "range": 5.0, "slow": 0.35, "slow_time": 1.6},
@@ -46,7 +46,7 @@ const TURRETS := {
 	},
 	"fish": {
 		"name": "Fish Cannon", "cost": 110, "kind": "lob", "key": "3",
-		"desc": "Lobs smelly fish that splash every dog in the area.",
+		"desc": "Lobs smelly fish that splash every critter in the area.",
 		"fur": Color("ff9f43"), "accent": Color("5dade2"), "icon": "fish",
 		"levels": [
 			{"dmg": 26.0, "rate": 0.55, "range": 8.0, "splash": 2.2},
@@ -57,7 +57,7 @@ const TURRETS := {
 	},
 	"laser": {
 		"name": "Laser Kitty", "cost": 130, "kind": "beam", "key": "4",
-		"desc": "Locks a laser pointer on one dog. Damage ramps up the longer it stares.",
+		"desc": "Locks a laser pointer on one critter. Damage ramps up the longer it stares.",
 		"fur": Color("f5f0e6"), "accent": Color("ff2d55"), "icon": "laser",
 		"levels": [
 			{"dps": 16.0, "range": 6.0, "ramp": 2.5},
@@ -84,19 +84,19 @@ const TARGET_MODES := ["First", "Last", "Strong", "Close"]
 # ------------------------------------------------------------------ dogs
 const ENEMIES := {
 	"pup": {"name": "Pup", "hp": 26.0, "speed": 3.6, "armor": 0.0, "gold": 3, "lives": 1,
-		"size": 0.55, "coat": Color("e09a4f"), "ear": Color("8a5a30"), "threat": 1.0, "interval": 0.55},
+		"model": "dog", "scale": 0.55, "tint": Color(1, 1, 1), "coat": Color("e09a4f"), "threat": 1.0, "interval": 0.55},
 	"hound": {"name": "Hound", "hp": 60.0, "speed": 2.8, "armor": 0.0, "gold": 5, "lives": 1,
-		"size": 0.7, "coat": Color("a0643b"), "ear": Color("5b3820"), "threat": 2.0, "interval": 0.8},
-	"greyhound": {"name": "Greyhound", "hp": 40.0, "speed": 5.4, "armor": 0.0, "gold": 5, "lives": 1,
-		"size": 0.7, "coat": Color("8792a6"), "ear": Color("566073"), "threat": 2.0, "interval": 0.6, "slim": true},
-	"poodle": {"name": "Poodle", "hp": 90.0, "speed": 2.5, "armor": 0.0, "gold": 9, "lives": 1,
-		"size": 0.72, "coat": Color("f59ac8"), "ear": Color("d9609f"), "threat": 4.0, "interval": 1.2, "healer": true},
-	"bulldog": {"name": "Bulldog", "hp": 180.0, "speed": 1.7, "armor": 3.0, "gold": 11, "lives": 2,
-		"size": 0.85, "coat": Color("c49a6c"), "ear": Color("7a5636"), "threat": 5.0, "interval": 1.6, "chunky": true},
+		"model": "dog", "scale": 0.78, "tint": Color(0.8, 0.62, 0.5), "coat": Color("a0643b"), "threat": 2.0, "interval": 0.8},
+	"greyhound": {"name": "Fox", "hp": 40.0, "speed": 5.4, "armor": 0.0, "gold": 5, "lives": 1,
+		"model": "fox", "scale": 0.68, "tint": Color(1, 1, 1), "coat": Color("ff8a3d"), "threat": 2.0, "interval": 0.6},
+	"poodle": {"name": "Nurse Bunny", "hp": 90.0, "speed": 2.5, "armor": 0.0, "gold": 9, "lives": 1,
+		"model": "bunny", "scale": 0.7, "tint": Color(1.25, 1.0, 1.15), "coat": Color("f59ac8"), "threat": 4.0, "interval": 1.2, "healer": true},
+	"bulldog": {"name": "Boar", "hp": 180.0, "speed": 1.7, "armor": 3.0, "gold": 11, "lives": 2,
+		"model": "hog", "scale": 0.9, "tint": Color(1, 1, 1), "coat": Color("c46a4a"), "threat": 5.0, "interval": 1.6},
 	"alpha": {"name": "Alpha Hound", "hp": 620.0, "speed": 1.5, "armor": 3.0, "gold": 120, "lives": 3,
-		"size": 1.45, "coat": Color("4b4e5c"), "ear": Color("2a2c35"), "threat": 0.0, "interval": 2.0, "boss": true},
-	"vacuum": {"name": "Vacuum 3000", "hp": 1700.0, "speed": 1.1, "armor": 5.0, "gold": 220, "lives": 5,
-		"size": 1.6, "coat": Color("ff4d6d"), "ear": Color("30303a"), "threat": 0.0, "interval": 2.0, "boss": true, "robot": true},
+		"model": "dog", "scale": 1.35, "tint": Color(0.5, 0.46, 0.62), "coat": Color("4b4e5c"), "threat": 0.0, "interval": 2.0, "boss": true},
+	"vacuum": {"name": "Big Ellie", "hp": 1700.0, "speed": 1.1, "armor": 5.0, "gold": 220, "lives": 5,
+		"model": "elephant", "scale": 1.3, "tint": Color(1, 1, 1), "coat": Color("a9b0d6"), "threat": 0.0, "interval": 2.0, "boss": true},
 }
 const UNLOCK_WAVE := {"pup": 1, "hound": 2, "greyhound": 4, "bulldog": 6, "poodle": 8}
 
@@ -105,7 +105,7 @@ const PERKS := {
 	"claws": {"name": "Sharp Claws", "desc": "All kittens deal +15% damage.", "icon": "paw", "color": Color("ff6b6b"), "max": 5},
 	"caffeine": {"name": "Catfeine", "desc": "All kittens attack 12% faster.", "icon": "bolt", "color": Color("ffd23f"), "max": 5},
 	"eyes": {"name": "Eagle Eyes", "desc": "All kittens get +12% range.", "icon": "eye", "color": Color("5dade2"), "max": 3},
-	"burglar": {"name": "Cat Burglar", "desc": "Dogs drop 20% more gold.", "icon": "coin", "color": Color("ffd23f"), "max": 4},
+	"burglar": {"name": "Cat Burglar", "desc": "Critters drop 20% more gold.", "icon": "coin", "color": Color("ffd23f"), "max": 4},
 	"interest": {"name": "Hoarder", "desc": "Earn 6% interest on your gold after each wave (max 60).", "icon": "coin", "color": Color("7bd389"), "max": 3},
 	"bigpaw": {"name": "Big Paw Energy", "desc": "Paw Slam hits 50% harder and 20% wider.", "icon": "paw", "color": Color("ff9f43"), "max": 3},
 	"quickpaws": {"name": "Quick Paws", "desc": "Abilities recharge 20% faster.", "icon": "bolt", "color": Color("a66cff"), "max": 3},
@@ -127,7 +127,7 @@ const META := {
 	"claws": {"name": "Scratching Post", "desc": "+6% kitten damage", "icon": "paw", "base": 20, "max": 5},
 	"hero": {"name": "Hero Training", "desc": "Your cat hits 25% harder, 10% faster", "icon": "cat", "base": 15, "max": 5},
 	"paw": {"name": "Heavy Paw", "desc": "+25% Paw Slam damage", "icon": "paw", "base": 20, "max": 4},
-	"magnet": {"name": "Treat Magnet", "desc": "+6% gold from dogs", "icon": "coin", "base": 20, "max": 5},
+	"magnet": {"name": "Treat Magnet", "desc": "+6% gold from critters", "icon": "coin", "base": 20, "max": 5},
 	"cooldown": {"name": "Power Nap", "desc": "Abilities recharge 8% faster", "icon": "bolt", "base": 25, "max": 4},
 	"discount": {"name": "Bulk Kibble", "desc": "Kittens cost 4% less", "icon": "coin", "base": 25, "max": 5},
 	"reroll": {"name": "Lucky Paw", "desc": "+1 perk reroll per run", "icon": "star", "base": 30, "max": 3},

@@ -6,7 +6,7 @@
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, hint_default_white;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform float vertex_color_amount = 0.0;
-uniform vec4 shadow_tint : source_color = vec4(0.56, 0.5, 0.78, 1.0);
+uniform vec4 shadow_tint : source_color = vec4(0.6, 0.62, 0.78, 1.0);
 uniform float band_threshold = 0.08;
 uniform float band_softness = 0.05;
 uniform float mid_band = 0.55;

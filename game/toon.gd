@@ -14,8 +14,10 @@ static var outlines_enabled := true
 
 
 ## Cached toon material for a texture + tint combination.
-static func material_for(tex: Texture2D, tint := Color(1, 1, 1), vertex_colors := false) -> ShaderMaterial:
-	var key := "%s|%s|%s" % [tex.resource_path if tex else "white", tint.to_html(), vertex_colors]
+## `ground` = flat board surfaces: no rim light or highlight, which otherwise
+## glint along the road's bevelled edges.
+static func material_for(tex: Texture2D, tint := Color(1, 1, 1), vertex_colors := false, ground := false) -> ShaderMaterial:
+	var key := "%s|%s|%s|%s" % [tex.resource_path if tex else "white", tint.to_html(), vertex_colors, ground]
 	if not _tex_materials.has(key):
 		var m := ShaderMaterial.new()
 		m.shader = TOON_SHADER
@@ -25,6 +27,9 @@ static func material_for(tex: Texture2D, tint := Color(1, 1, 1), vertex_colors :
 			m.set_shader_parameter("tint", tint)
 		if vertex_colors:
 			m.set_shader_parameter("vertex_color_amount", 1.0)
+		if ground:
+			m.set_shader_parameter("rim_strength", 0.0)
+			m.set_shader_parameter("specular_strength", 0.0)
 		_tex_materials[key] = m
 	return _tex_materials[key]
 

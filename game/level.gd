@@ -171,7 +171,7 @@ func _build_tiles() -> void:
 				var r := _rng.randf()
 				_add("tile-tree" if r < 0.4 else ("tile-tree-double" if r < 0.75 else "tile-tree-quad"), _tile_xf(c, _rng.randi_range(0, 3) * PI * 0.5))
 			elif ch == "R":
-				_add("tile-rock" if _rng.randf() < 0.7 else "tile-crystal", _tile_xf(c, _rng.randi_range(0, 3) * PI * 0.5))
+				_add("tile-rock", _tile_xf(c, _rng.randi_range(0, 3) * PI * 0.5))
 			else:
 				# two tints of the same tile model make a soft checkerboard
 				_add("tile|a" if (x + y) % 2 == 0 else "tile|b", _tile_xf(c))
@@ -215,7 +215,7 @@ func _build_surroundings() -> void:
 	ground.position.y = -1.0
 	add_child(ground)
 	# forest and rocks around the board
-	var kinds := ["detail-tree", "detail-tree", "detail-tree-large", "detail-tree-large", "detail-rocks", "detail-tree", "detail-crystal", "detail-rocks-large"]
+	var kinds := ["detail-tree", "detail-tree", "detail-tree-large", "detail-tree-large", "detail-rocks", "detail-tree", "detail-rocks-large"]
 	for i in 320:
 		var p := Vector3(_rng.randf_range(-half.x - 16, half.x + 16), -1.0, _rng.randf_range(-half.y - 14, half.y + 10))
 		if absf(p.x) < half.x + 0.8 and absf(p.z) < half.y + 0.8:
@@ -257,7 +257,9 @@ func _flush_batches() -> void:
 		var tint := Color(1, 1, 1)
 		if key.ends_with("|b"):
 			tint = Color(0.93, 0.97, 0.9)
-		var outline: bool = model.begins_with("detail") or model in ["tile-tree", "tile-tree-double", "tile-tree-quad", "tile-rock", "tile-crystal"]
+		elif "rock" in model:
+			tint = Color(1.0, 0.96, 0.82) # warm the kit's lavender stone to a natural grey
+		var outline: bool = model.begins_with("detail") or model in ["tile-tree", "tile-tree-double", "tile-tree-quad", "tile-rock"]
 		for part in _mesh_of(model):
 			var list := []
 			for x in xforms:

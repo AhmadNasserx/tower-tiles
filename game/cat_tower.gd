@@ -29,7 +29,16 @@ func setup(p_game: Game) -> void:
 		n.position.y = y
 		_body.add_child(n)
 		Toon.apply(n, true, true)
-		y += (0.6 if piece != "tower-round-top-b" else 0.2) * TS
+		y += (0.6 if piece != "tower-round-top-b" else 0.5) * TS
+	# wooden deck flush with the battlement tops; your cat stands on it, so
+	# turning, hopping and puffing up can never clip into the walls
+	var k := MeshKit.new()
+	k.cylinder(Vector3(0, -0.04, 0), 0.42 * TS, 0.08, Turret.DECK_COLOR, Vector3.ZERO, 1.0, 18)
+	for i in 5:
+		k.box(Vector3(0, 0.002, (i - 2) * 0.15 * TS), Vector3(0.8 * TS, 0.004, 0.012 * TS), Turret.DECK_COLOR.darkened(0.25))
+	var deck := MeshKit.instance(k.build(), _body, false)
+	deck.position.y = y
+	Toon.apply(deck, false, false)
 	_cat_pivot = Node3D.new()
 	_cat_pivot.position.y = y
 	_body.add_child(_cat_pivot)

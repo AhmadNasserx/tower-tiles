@@ -16,6 +16,14 @@ const STYLE := {
 	"fatcat": {"bottom": "", "weapon": "", "pet": "lion", "tint": Color(1, 1, 1), "muzzle": Vector3(0, 0.5, 0)},
 }
 
+# Kit -> world scale for weapons, and the kittens that man them. Sized so
+# kitten + weapon fit on the tower's deck (radius ~0.78) at any angle.
+const WEAPON_SCALE := 1.05
+const KITTEN_SCALE := 0.42
+const CREW_GAP := 0.14 # space between the weapon's back and the kitten's nose
+const DECK_COLOR := Color("b9835a")
+const FLAG_RADIUS := 0.8 # just outside the top tier's wall (outer radius 0.78)
+
 static var _scenes := {}
 
 var game: Game
@@ -143,30 +151,28 @@ func _build() -> void:
 	add_child(_turn)
 	_weapon = Node3D.new()
 	_turn.add_child(_weapon)
-	const WS := 0.85 # weapons sit just in front of their kitten
+	var w: Node3D = null
 	if st.weapon != "":
-		var w := _piece(st.weapon)
+		w = _piece(st.weapon)
 		w.rotation.y = PI
-		w.scale = Vector3.ONE * TS * WS
+		w.scale = Vector3.ONE * WEAPON_SCALE
 		_weapon.add_child(w)
-		_weapon.position = Vector3(0, 0, -0.22) * TS
 		Toon.apply(w, true, true)
 	_muzzle = Node3D.new()
 	_weapon.add_child(_muzzle)
-	_muzzle.position = st.muzzle * TS * WS
+	_muzzle.position = st.muzzle * WEAPON_SCALE
 	match type:
 		"hiss":
 			# a spooky black cat, all puffed up
-			cat = PetRig.create("cat", 0.5, st.tint)
-			_turn.add_child(cat)
+			cat = PetRig.create("cat", 0.46, st.tint)
 		"fatcat":
 			cat = PetRig.create("lion", 0.62)
-			_turn.add_child(cat)
 			cat.play("idle", 0.4)
 		_:
-			cat = PetRig.create(st.pet, 0.45, st.tint)
-			cat.position = Vector3(0, 0, 0.16) * TS
-			_turn.add_child(cat)
+			cat = PetRig.create(st.pet, KITTEN_SCALE, st.tint)
+	_turn.add_child(cat)
+	if w:
+		_layout_crew(w)
 	_rebuild_stack()
 	if def.kind == "beam":
 		for i in 3:
@@ -192,6 +198,48 @@ func _build() -> void:
 		add_child(_beam_dot)
 
 
+## Places weapon and kitten from their real mesh bounds: the weapon's back
+## edge ends CREW_GAP in front of the kitten's nose, and the pair is centred
+## on the tower. Both turn together, so they can never overlap.
+func _layout_crew(w: Node3D) -> void:
+	var cat_box := _bounds(cat, _turn)
+	var w_box := _bounds(w, _turn)
+	cat.position.z = CREW_GAP * 0.5 - cat_box.position.z
+	_weapon.position.z = -CREW_GAP * 0.5 - w_box.end.z
+	# centre on the body (front of weapon .. back of the kitten's body, tail excluded)
+	var front := _weapon.position.z + w_box.position.z
+	var back := cat.position.z + cat_box.position.z + cat_box.size.z * 0.6
+	var shift := -(front + back) * 0.5
+	cat.position.z += shift
+	_weapon.position.z += shift
+
+
+## Merged mesh AABB of `node` in the space of `space` (ignores outline hulls).
+static func _bounds(node: Node3D, space: Node3D) -> AABB:
+	var out := [null]
+	_bounds_rec(node, space.global_transform.affine_inverse() * node.global_transform if node.is_inside_tree() else _rel(node, space), out)
+	return out[0] if out[0] != null else AABB()
+
+
+static func _rel(node: Node3D, space: Node3D) -> Transform3D:
+	var xf := Transform3D.IDENTITY
+	var n: Node = node
+	while n != null and n != space:
+		if n is Node3D:
+			xf = (n as Node3D).transform * xf
+		n = n.get_parent()
+	return xf
+
+
+static func _bounds_rec(n: Node, xf: Transform3D, out: Array) -> void:
+	if n is MeshInstance3D and (n as MeshInstance3D).mesh and not n.has_meta("outline"):
+		var b: AABB = xf * (n as MeshInstance3D).mesh.get_aabb()
+		out[0] = b if out[0] == null else (out[0] as AABB).merge(b)
+	for c in n.get_children():
+		if c is Node3D:
+			_bounds_rec(c, xf * (c as Node3D).transform, out)
+
+
 ## Stacks tower pieces for the current level and puts the kitten on top.
 func _rebuild_stack() -> void:
 	for c in _stack.get_children():
@@ -215,10 +263,18 @@ func _rebuild_stack() -> void:
 		n.position.y = y
 		_stack.add_child(n)
 		Toon.apply(n, true, true)
-		var h: float = heights.get(p, 0.6) * TS
-		# kittens stand inside the battlements, not on top of them
-		y += h if p != "tower-round-top-a" else 0.3 * TS
+		y += heights.get(p, 0.6) * TS
 	_top_y = y
+	if type != "fatcat":
+		# a wooden deck flush with the battlement tops: the crew stands on it,
+		# so nothing they do (turning, hopping, recoil) can clip the walls
+		var k := MeshKit.new()
+		k.cylinder(Vector3(0, -0.04, 0), 0.32 * TS, 0.08, DECK_COLOR, Vector3.ZERO, 1.0, 16)
+		for i in 4:
+			k.box(Vector3(0, 0.002, (i - 1.5) * 0.13 * TS), Vector3(0.6 * TS, 0.004, 0.012 * TS), DECK_COLOR.darkened(0.25))
+		var deck := MeshKit.instance(k.build(), _stack, false)
+		deck.position.y = y
+		Toon.apply(deck, false, false)
 	if type == "fatcat":
 		_add_coin_pile()
 		_turn.position = Vector3(0, y, 0)
@@ -226,7 +282,7 @@ func _rebuild_stack() -> void:
 		cat.scale = Vector3.ONE * cat.base_scale
 	else:
 		_turn.position = Vector3(0, y, 0)
-	if level >= MAX_LEVEL:
+	if level >= MAX_LEVEL and type != "fatcat":
 		_add_flag(y)
 
 
@@ -245,14 +301,18 @@ func _add_coin_pile() -> void:
 	Toon.apply(mi, true, false, true)
 
 
+## Max-level banner: a gold pennant hanging down the front of the top tier.
+## It sits entirely below the deck, so the crew above can never touch it.
 func _add_flag(y: float) -> void:
 	var k := MeshKit.new()
-	k.cylinder(Vector3(0, 0.6, 0), 0.03, 1.2, Color("6b5d73"))
-	k.box(Vector3(0.2, 1.05, 0), Vector3(0.38, 0.24, 0.03), GameData.C_GOLD)
-	k.sphere(Vector3(0, 1.22, 0), Vector3.ONE * 0.06, GameData.C_GOLD, Vector3.ZERO, 8)
-	var mi := MeshKit.instance(k.build(), _stack)
-	mi.position = Vector3(0.62, y, 0.45)
-	Toon.apply(mi, true, true, true)
+	var gold := GameData.C_GOLD
+	k.box(Vector3(0, -0.06, 0), Vector3(0.5, 0.08, 0.06), Color("6b5d73")) # rod
+	k.box(Vector3(0, -0.36, 0), Vector3(0.4, 0.52, 0.03), gold)
+	k.cone(Vector3(0, -0.66, 0), 0.2, 0.18, gold, Vector3(180, 45, 0), 4, 0.08)
+	k.sphere(Vector3(0, -0.36, 0.03), Vector3(0.09, 0.09, 0.02), Color("e8484f"), Vector3.ZERO, 8)
+	var mi := MeshKit.instance(k.build(), _stack, false)
+	mi.position = Vector3(0, y - 0.04, FLAG_RADIUS) # +Z faces the camera
+	Toon.apply(mi, true, false, true)
 
 
 # ------------------------------------------------------------------ logic

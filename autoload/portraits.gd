@@ -96,7 +96,7 @@ func _build(key: String) -> void:
 		t._build()
 		t.rotation.y = 0.0
 		t._turn.rotation.y = PI + 0.5 # three-quarter view of kitten and weapon
-		_frame(Vector3(0, 1.55, 0), 4.7, -22.0, 28.0)
+		_frame(Vector3(0, 1.5, 0), 5.5, -20.0, 28.0)
 	elif key.begins_with("critter:"):
 		var type := key.get_slice(":", 1)
 		var d: Dictionary = GameData.ENEMIES[type]

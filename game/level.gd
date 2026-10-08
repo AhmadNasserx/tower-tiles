@@ -1,6 +1,6 @@
 class_name Level
 extends Node3D
-## Builds a map from GameData.MAPS out of Kenney Tower Defense Kit tiles:
+## Builds a map (from GameData.MAPS or MapGen) out of Kenney Tower Defense Kit tiles:
 ## grass, auto-oriented road pieces, trees/rocks, decor around the board, and
 ## the enemy path curve. Each tile type is one MultiMesh (one draw call).
 
@@ -23,7 +23,7 @@ var _batches := {} # model name -> Array[Transform3D]
 
 func build(p_map: Dictionary) -> void:
 	map = p_map
-	_rng.seed = hash(map.id)
+	_rng.seed = hash(map.id) + int(map.get("seed", 0))
 	grid.assign(map.grid)
 	rows = grid.size()
 	cols = grid[0].length()

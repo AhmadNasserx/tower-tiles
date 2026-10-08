@@ -40,7 +40,7 @@ Pups (weak), Hounds, Foxes (very fast), Boars (armored, cost 2 lives), Nurse Bun
 2. **Purr-ks:** every 3 waves, pick 1 of 3 roguelite perks (Sharp Claws, Catfeine, Lucky Whiskers crits, Yarn Storm, Hoarder interest…). They stack.
 3. **The Cat Tree (meta):** surviving waves earns 🐟 fish, which buy permanent upgrades on the main menu (starting gold, extra lives, damage, paw power, cooldowns, perk rerolls…). Refundable anytime.
 
-Three maps unlock in order (The Backyard → Garden Maze → The Dog Park). Each run is 20 waves with a boss every 5; clear it to earn up to ★★★ (no lives lost), then keep going in **Endless Mode**.
+Three hand-made maps unlock in order (The Backyard → Garden Maze → The Dog Park), and **Wild Meadow** generates a brand-new winding road, trees and rocks every time you pick it (the map-select card previews the exact layout; Restart keeps it). Each run is 20 waves with a boss every 5; clear it to earn up to ★★★ (no lives lost), then keep going in **Endless Mode**.
 
 ## Look
 - **Models:** Kenney's *Cube Pets* (animated cat, tiger, lion, dog, fox, boar, bunny, elephant, fish) and *Tower Defense Kit* (tiles, towers, weapons, trees), all CC0. Road tiles are picked and rotated automatically from each ASCII map.
@@ -83,6 +83,7 @@ tools/      gen_audio.py: regenerates all audio (python3 + numpy + ffmpeg)
 ```
 
 ### Add a map
+Procedural maps come from `game/map_gen.gd` (a random self-avoiding walk on a coarse lattice, so the road can never touch itself). Hand-made maps:
 Add an entry to `GameData.MAPS`: an ASCII grid where `.` is buildable grass, `#` is road, `S` is the critters' burrow, `C` is your cat's tower, and `T`/`R` are trees and rocks. Roads must not touch sideways.
 
 ### Rebalance

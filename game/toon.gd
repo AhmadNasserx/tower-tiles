@@ -74,9 +74,9 @@ static func apply(root: Node, outline := true, shadows := true, thin := false, t
 static func _apply_rec(n: Node, outline: bool, shadows: bool, thin: bool, tint: Color, out: Array[GeometryInstance3D]) -> void:
 	if n is MeshInstance3D and (n as MeshInstance3D).mesh and not n.has_meta("outline"):
 		var mi := n as MeshInstance3D
-		var src: Material = mi.get_active_material(0)
-		var tex := _albedo_of(src)
-		mi.material_override = material_for(tex, tint) if tex else material_for(null, tint, true)
+		# one toon material per surface, so multi-material models keep their colours
+		for si in mi.mesh.get_surface_count():
+			mi.set_surface_override_material(si, _toon_for(mi.get_active_material(si), tint))
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		out.append(mi)
 		if outline:
@@ -88,6 +88,17 @@ static func _apply_rec(n: Node, outline: bool, shadows: bool, thin: bool, tint: 
 			mi.add_child(o)
 	for c in n.get_children():
 		_apply_rec(c, outline, shadows, thin, tint, out)
+
+
+static func _toon_for(src: Material, tint: Color) -> Material:
+	var tex := _albedo_of(src)
+	if tex:
+		return material_for(tex, tint)
+	if src is BaseMaterial3D and not (src as BaseMaterial3D).vertex_color_use_as_albedo:
+		# plain coloured material: keep its colour
+		var c := (src as BaseMaterial3D).albedo_color
+		return material_for(null, Color(c.r * tint.r, c.g * tint.g, c.b * tint.b))
+	return material_for(null, tint, true)
 
 
 ## Outline hull for `mesh`: all surfaces merged, normals averaged per position

@@ -217,11 +217,9 @@ def make_sfx():
             osc(glide(120, 40, 0.25), "sine") * env(int(0.25 * SR), decay=True) * 0.8)
     write_wav("splash", soft_clip(s, 1.6), 0.7)
 
-    # Dog defeated: little boof + yip variants
+    # Critter defeated: little boof variants
     write_wav("die", seq(boof(1.0), np.zeros(200)), 0.55)
-    yip = osc(glide(900, 1400, 0.08, 0.5), "tri") * env(int(0.08 * SR), decay=True)
     write_wav("die2", boof(1.35), 0.55)
-    write_wav("yip", lowpass(yip, 3000), 0.4)
 
     # Coin
     s = seq(tone(988, 0.05, "square", 0.25, release=0.01),
@@ -316,11 +314,6 @@ def make_sfx():
     # Heal (poodle)
     s = seq(tone(note_hz(84), 0.06, "sine", decay=True), tone(note_hz(91), 0.12, "sine", decay=True))
     write_wav("heal", s, 0.25)
-
-    # Snore for the fat cat
-    d = 0.8
-    s = lowpass(noise(d), 500) * (np.sin(np.linspace(0, np.pi, int(d * SR))) ** 2)
-    write_wav("snore", s, 0.35)
 
     # Cash register for fat cat payout
     s = seq(tone(note_hz(88), 0.05, "square", 0.25, decay=True), tone(note_hz(93), 0.05, "square", 0.25, decay=True),

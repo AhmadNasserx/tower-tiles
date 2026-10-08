@@ -1,7 +1,7 @@
 class_name CatTower
 extends Node3D
-## The cat tree at the end of the road, with YOUR cat on top. The cat throws
-## hairballs at dogs that get close and reacts to everything that happens.
+## The castle tower at the end of the road, with YOUR cat on top. The cat throws
+## hairballs at critters that get close and reacts to everything that happens.
 
 const TS := 2.0
 const MODEL := "tiger" # Cube Pets' tiger makes a perfect big orange tabby
@@ -33,7 +33,7 @@ func setup(p_game: Game) -> void:
 	_cat_pivot = Node3D.new()
 	_cat_pivot.position.y = y
 	_body.add_child(_cat_pivot)
-	cat = PetRig.create(MODEL, 0.95)
+	cat = PetRig.create(MODEL, 0.7)
 	_cat_pivot.add_child(cat)
 
 

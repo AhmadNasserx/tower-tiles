@@ -1,29 +1,13 @@
 class_name MeshKit
 ## Builds low-poly models out of primitive shapes, baked into a single
 ## vertex-coloured ArrayMesh. One mesh + one shared material = one draw call,
-## which keeps the web build fast even with lots of dogs on screen.
+## which keeps the web build fast.
 
 var _st := SurfaceTool.new()
 var _empty := true
 
-static var _material: StandardMaterial3D
 static var _unshaded: StandardMaterial3D
-static var _flash: StandardMaterial3D
 static var _prim_cache := {}
-
-
-static func material() -> StandardMaterial3D:
-	if _material == null:
-		_material = StandardMaterial3D.new()
-		_material.vertex_color_use_as_albedo = true
-		_material.vertex_color_is_srgb = true
-		_material.roughness = 0.85
-		_material.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-		_material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-		_material.rim_enabled = true
-		_material.rim = 0.25
-		_material.rim_tint = 0.6
-	return _material
 
 
 static func unshaded() -> StandardMaterial3D:
@@ -33,15 +17,6 @@ static func unshaded() -> StandardMaterial3D:
 		_unshaded.vertex_color_is_srgb = true
 		_unshaded.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return _unshaded
-
-
-## Pure white material swapped in for a frame when something is hit.
-static func flash_material() -> StandardMaterial3D:
-	if _flash == null:
-		_flash = StandardMaterial3D.new()
-		_flash.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_flash.albedo_color = Color(1, 1, 1)
-	return _flash
 
 
 static func color_material(c: Color, unshaded_mat := false, transparent := false) -> StandardMaterial3D:

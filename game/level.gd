@@ -204,14 +204,14 @@ func _build_surroundings() -> void:
 	var bm := BoxMesh.new()
 	bm.size = Vector3(half.x * 2.0, 1.2, half.y * 2.0)
 	under.mesh = bm
-	under.material_override = Toon.material_for(null, Color("8a5a3c"))
+	under.material_override = Toon.material_for(null, Color("8a5a3c"), false, true)
 	under.position.y = -TOP - 0.6
 	add_child(under)
 	var ground := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(260, 260)
 	ground.mesh = pm
-	ground.material_override = Toon.material_for(null, (map.grass[1] as Color).darkened(0.3))
+	ground.material_override = Toon.material_for(null, (map.grass[1] as Color).darkened(0.3), false, true)
 	ground.position.y = -1.0
 	add_child(ground)
 	# forest and rocks around the board
@@ -262,7 +262,7 @@ func _flush_batches() -> void:
 			var list := []
 			for x in xforms:
 				list.append(x * part[1])
-			_multimesh(part[0], list, Toon.material_for(part[2], tint), true)
+			_multimesh(part[0], list, Toon.material_for(part[2], tint, false, model.begins_with("tile")), true)
 			if outline and Toon.outlines_enabled:
 				_multimesh(Toon.smooth_mesh(part[0]), list, Toon.outline_material(true), false)
 	_batches.clear()

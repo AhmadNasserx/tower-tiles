@@ -183,6 +183,7 @@ func _show_maps() -> void:
 	v.add_child(row)
 	for i in GameData.MAPS.size():
 		row.add_child(_map_card(i))
+	row.add_child(_wild_card())
 	var back := UIKit.button("Back", _close_panel, 20, "yellow")
 	back.custom_minimum_size.x = 160
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -227,6 +228,50 @@ func _map_card(i: int) -> Control:
 	v.add_child(info)
 	b.pressed.connect(func():
 		Game.selected_map = i
+		Sfx.play("meow", 1.0, 0.05)
+		Transition.change_scene("res://scenes/game.tscn"))
+	UIKit.juicy(b, 1.04)
+	return b
+
+
+## The procedural map: shows a preview of the exact road you'll get, and a
+## fresh one every time this screen opens.
+func _wild_card() -> Control:
+	var m := MapGen.generate(randi())
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(250, 300)
+	b.add_theme_stylebox_override("normal", UIKit.sbox("sq_grey.png", 20, Vector4(8, 8, 8, 8), Color(1.08, 1.06, 1.0)))
+	b.add_theme_stylebox_override("hover", UIKit.sbox("sq_yellow.png", 20, Vector4(8, 8, 8, 8)))
+	b.add_theme_stylebox_override("pressed", UIKit.sbox("sq_yellow_pressed.png", 20, Vector4(8, 8, 8, 8)))
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var v := UIKit.vbox(8)
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.offset_left = 14
+	v.offset_right = -14
+	v.offset_top = 14
+	v.offset_bottom = -20
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(v)
+	v.add_child(_map_thumb(m, true))
+	var name_l := UIKit.label(m.name, 26, UIKit.INK, 0, true)
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(name_l)
+	var desc := UIKit.label(m.desc, 15, UIKit.INK_SOFT)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(desc)
+	var stars := UIKit.hbox(4)
+	stars.alignment = BoxContainer.ALIGNMENT_CENTER
+	var got := int(Save.stars.get(MapGen.ID, 0))
+	for s in 3:
+		stars.add_child(UIKit.icon("star" if s < got else "star_empty", Color.WHITE, 32))
+	v.add_child(stars)
+	var info := UIKit.label("Random road   ·   Best wave %d" % int(Save.best_wave.get(MapGen.ID, 0)), 14, UIKit.INK_SOFT)
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(info)
+	b.pressed.connect(func():
+		Game.custom_map = m
+		Game.selected_map = -1
 		Sfx.play("meow", 1.0, 0.05)
 		Transition.change_scene("res://scenes/game.tscn"))
 	UIKit.juicy(b, 1.04)

@@ -10,6 +10,8 @@ signal selection_changed(turret: Turret)
 signal build_mode_changed(type: String)
 
 static var selected_map := 0
+## Set (with selected_map = -1) to play a generated map; kept for restarts.
+static var custom_map := {}
 
 @export var demo := false
 
@@ -87,7 +89,10 @@ var _demo_t := 0.0
 
 
 func _ready() -> void:
-	map = GameData.MAPS[clampi(selected_map, 0, GameData.MAPS.size() - 1)]
+	if selected_map < 0 and not custom_map.is_empty():
+		map = custom_map
+	else:
+		map = GameData.MAPS[clampi(selected_map, 0, GameData.MAPS.size() - 1)]
 	_build_world()
 	_apply_meta()
 	_next_events = GameData.build_wave(1, map.difficulty)

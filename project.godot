@@ -27,6 +27,7 @@ driver/output_latency.web=50
 Save="*res://autoload/save.gd"
 Sfx="*res://autoload/sfx.gd"
 Transition="*res://autoload/transition.gd"
+Portraits="*res://autoload/portraits.gd"
 
 [display]
 

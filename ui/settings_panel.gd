@@ -5,32 +5,31 @@ signal closed
 
 
 func _ready() -> void:
-	add_theme_constant_override("separation", 10)
-	custom_minimum_size = Vector2(380, 0)
-	add_child(UIKit.label("Settings", 30, GameData.C_ORANGE, 0, true))
+	add_theme_constant_override("separation", 12)
+	custom_minimum_size = Vector2(400, 0)
 	_slider("Master volume", "master")
 	_slider("Music", "music")
 	_slider("Sound effects", "sfx")
-	var shake := CheckButton.new()
+	var shake := CheckBox.new()
 	shake.text = "Screen shake"
 	shake.button_pressed = Save.settings.shake
 	shake.toggled.connect(func(v): Save.set_setting("shake", v))
 	add_child(shake)
-	var quality := CheckButton.new()
-	quality.text = "Fancy graphics (shadows, full resolution)"
+	var quality := CheckBox.new()
+	quality.text = "Fancy graphics (shadows, outlines, full res)"
 	quality.button_pressed = Save.settings.quality != "low"
 	quality.toggled.connect(func(v): Save.set_setting("quality", "high" if v else "low"))
 	add_child(quality)
-	var note := UIKit.label("Graphics changes apply on the next level load.", 14, Color("b9adc0"))
-	add_child(note)
-	var back := UIKit.button("Back", func(): closed.emit())
+	add_child(UIKit.label("Graphics changes apply on the next level load.", 14, UIKit.INK_SOFT))
+	var back := UIKit.button("Back", func(): closed.emit(), 22, "yellow")
+	back.custom_minimum_size.x = 180
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	add_child(back)
 
 
 func _slider(title: String, key: String) -> void:
 	var row := UIKit.hbox(12)
-	var l := UIKit.label(title, 18)
+	var l := UIKit.label(title, 18, UIKit.INK)
 	l.custom_minimum_size.x = 150
 	row.add_child(l)
 	var s := HSlider.new()
@@ -38,7 +37,7 @@ func _slider(title: String, key: String) -> void:
 	s.max_value = 1.0
 	s.step = 0.05
 	s.value = Save.settings[key]
-	s.custom_minimum_size = Vector2(190, 28)
+	s.custom_minimum_size = Vector2(210, 32)
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	s.value_changed.connect(func(v):
 		Save.settings[key] = v

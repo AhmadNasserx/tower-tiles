@@ -18,7 +18,7 @@ var delay := 0.0
 var _t := 0.0
 var _duration := 0.3
 var _arc := 0.6
-var _model: MeshInstance3D
+var _model: Node3D
 var _spin := Vector3.ZERO
 
 
@@ -52,14 +52,24 @@ func setup(p_game: Game, p_source: Node, from: Vector3, p_target: Enemy, dmg: fl
 			_duration = clampf(d / 14.0, 0.15, 0.6)
 			_arc = 0.8 + d * 0.08
 			_spin = Vector3(8, 8, 0)
-	_model = MeshKit.instance(_mesh(kind, crit), self, false)
+	if kind == "fish":
+		# a real (cartoon) fish from Kenney Cube Pets
+		var fish: Node3D = PetRig.scene("fish").instantiate()
+		fish.scale = Vector3.ONE * 0.32
+		_model = Node3D.new()
+		_model.add_child(fish)
+		add_child(_model)
+		Toon.apply(fish, true, false, true, Color(1.4, 1.2, 0.5) if crit else Color(1, 1, 1))
+	else:
+		_model = MeshKit.instance(_mesh(kind, crit), self, false)
+		Toon.apply(_model, true, false, true)
 	position = start
 	visible = delay <= 0.0
 
 
 func _aim_point() -> Vector3:
 	if target and is_instance_valid(target) and target.alive:
-		return target.global_position + Vector3(0, 0.45 * target.size, 0)
+		return target.global_position + Vector3(0, 0.5 * target.height, 0)
 	return target_pos
 
 

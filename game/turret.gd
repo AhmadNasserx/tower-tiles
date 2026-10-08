@@ -1,11 +1,22 @@
 class_name Turret
 extends Node3D
-## A kitten on a scratching post. Behaviour is driven by GameData.TURRETS.
+## A kitten on a little castle tower. Behaviour is driven by GameData.TURRETS.
+## Models: Kenney Tower Defense Kit + Cube Pets (CC0), drawn with the toon shader.
 
 const MAX_LEVEL := 3
+const TS := 1.7 # tower kit -> world scale (a kit tile is 1 unit, ours are 2)
+const TD := "res://assets/models/td/"
 
-static var _post_cache := {}
-static var _weapon_cache := {}
+# Tower pieces per level (bottom to top) and the kitten + weapon on top.
+const STYLE := {
+	"yarn": {"bottom": "tower-round-bottom-a", "weapon": "weapon-ballista", "pet": "cat", "tint": Color(1, 1, 1), "muzzle": Vector3(0, 0.3, -0.42)},
+	"fish": {"bottom": "tower-round-bottom-b", "weapon": "weapon-cannon", "pet": "cat", "tint": Color(1.45, 0.95, 0.55), "muzzle": Vector3(0, 0.3, -0.4)},
+	"laser": {"bottom": "tower-round-bottom-c", "weapon": "weapon-turret", "pet": "cat", "tint": Color(1.4, 1.4, 1.5), "muzzle": Vector3(0, 0.32, -0.36)},
+	"hiss": {"bottom": "tower-round-bottom-b", "weapon": "", "pet": "cat", "tint": Color(0.42, 0.38, 0.5), "muzzle": Vector3(0, 0.5, 0)},
+	"fatcat": {"bottom": "", "weapon": "", "pet": "lion", "tint": Color(1, 1, 1), "muzzle": Vector3(0, 0.5, 0)},
+}
+
+static var _scenes := {}
 
 var game: Game
 var type := "yarn"
@@ -18,9 +29,10 @@ var kills := 0
 var damage_done := 0.0
 var jammed := 0.0
 
-var cat: CatRig
+var cat: PetRig
 var _turn: Node3D
-var _post_mi: MeshInstance3D
+var _stack: Node3D
+var _top_y := 0.0
 var _weapon: Node3D
 var _muzzle: Node3D
 var _cooldown := 0.5
@@ -115,37 +127,53 @@ func slow_amount() -> float:
 
 
 # ------------------------------------------------------------------ visuals
+static func _piece(piece: String) -> Node3D:
+	if not _scenes.has(piece):
+		_scenes[piece] = load(TD + piece + ".glb")
+	var n: Node3D = _scenes[piece].instantiate()
+	return n
+
+
 func _build() -> void:
-	_post_mi = MeshKit.instance(_post_mesh(type, level), self)
+	var st: Dictionary = STYLE[type]
+	_stack = Node3D.new()
+	add_child(_stack)
 	_turn = Node3D.new()
 	_turn.rotation.y = PI # face the camera until there is something to look at
 	add_child(_turn)
-	var pattern: String = {"yarn": "tabby", "hiss": "black", "fish": "tabby", "laser": "plain", "fatcat": "calico"}[type]
-	var eye: Color = {"hiss": Color("ffd23f"), "laser": Color("5dade2")}.get(type, Color("7bd389"))
-	cat = CatRig.create(def.fur, pattern, eye)
-	_turn.add_child(cat)
-	cat.scale = Vector3.ONE * 1.1
-	if type == "fatcat":
-		cat.scale = Vector3(1.3, 1.0, 1.25)
-		cat.sleepy = true
 	_weapon = Node3D.new()
 	_turn.add_child(_weapon)
-	MeshKit.instance(_weapon_mesh(type), _weapon)
+	const WS := 0.75 # weapons sit a bit smaller, in front of their kitten
+	if st.weapon != "":
+		var w := _piece(st.weapon)
+		w.rotation.y = PI
+		w.scale = Vector3.ONE * TS * WS
+		_weapon.add_child(w)
+		_weapon.position = Vector3(0, 0, -0.22) * TS
+		Toon.apply(w, true, true)
 	_muzzle = Node3D.new()
 	_weapon.add_child(_muzzle)
+	_muzzle.position = st.muzzle * TS * WS
 	match type:
-		"yarn": _muzzle.position = Vector3(0.1, 0.55, -0.35)
-		"fish": _muzzle.position = Vector3(-0.32, 0.55, -0.55)
-		"laser": _muzzle.position = Vector3(0.08, 0.35, -0.6)
-		"hiss": _muzzle.position = Vector3(0, 0.6, -0.4)
-		_: _muzzle.position = Vector3(0, 0.6, 0)
-	_place_on_post()
+		"hiss":
+			# a spooky black cat, all puffed up
+			cat = PetRig.create("cat", 0.8, st.tint)
+			_turn.add_child(cat)
+		"fatcat":
+			cat = PetRig.create("lion", 0.95)
+			_turn.add_child(cat)
+			cat.play("idle", 0.4)
+		_:
+			cat = PetRig.create(st.pet, 0.72, st.tint)
+			cat.position = Vector3(0, 0, 0.16) * TS
+			_turn.add_child(cat)
+	_rebuild_stack()
 	if def.kind == "beam":
 		for i in 3:
 			var b := MeshInstance3D.new()
 			var bm := BoxMesh.new()
-			bm.size = Vector3(0.05, 0.05, 1.0)
-			bm.material = MeshKit.color_material(Color(1.0, 0.2, 0.3), true)
+			bm.size = Vector3(0.07, 0.07, 1.0)
+			bm.material = MeshKit.color_material(Color(1.0, 0.25, 0.35), true)
 			b.mesh = bm
 			b.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			b.top_level = true
@@ -154,9 +182,9 @@ func _build() -> void:
 			_beams.append(b)
 		_beam_dot = MeshInstance3D.new()
 		var dm := SphereMesh.new()
-		dm.radius = 0.12
-		dm.height = 0.24
-		dm.material = MeshKit.color_material(Color(1, 0.15, 0.25), true)
+		dm.radius = 0.14
+		dm.height = 0.28
+		dm.material = MeshKit.color_material(Color(1, 0.2, 0.3), true)
 		_beam_dot.mesh = dm
 		_beam_dot.top_level = true
 		_beam_dot.visible = false
@@ -164,87 +192,73 @@ func _build() -> void:
 		add_child(_beam_dot)
 
 
-func _post_height() -> float:
-	return 0.9 + level * 0.18
-
-
-func _place_on_post() -> void:
-	_turn.position.y = _post_height() + 0.1
-
-
-static func _post_mesh(t: String, lv: int) -> ArrayMesh:
-	var key := "%s%d" % [t, lv]
-	if _post_cache.has(key):
-		return _post_cache[key]
-	var d: Dictionary = GameData.TURRETS[t]
-	var accent: Color = d.accent
-	var h := 0.9 + lv * 0.18
-	var k := MeshKit.new()
-	k.cylinder(Vector3(0, 0.08, 0), 0.75, 0.16, Color("6b5d73"), Vector3.ZERO, 0.92, 12)
-	k.cylinder(Vector3(0, 0.17, 0), 0.62, 0.04, accent.darkened(0.2), Vector3.ZERO, 1.0, 12)
-	if t == "fatcat":
-		# a cosy pile of coins instead of a post
-		for i in 9:
-			var a := TAU * i / 9.0
-			k.cylinder(Vector3(cos(a) * 0.38, 0.22 + (i % 3) * 0.05, sin(a) * 0.38), 0.14, 0.05, GameData.C_GOLD, Vector3(randf_range(-15, 15), 0, randf_range(-15, 15)), 1.0, 8)
-		k.sphere(Vector3(0, 0.25 + h * 0.3, 0), Vector3(0.55, h * 0.45, 0.55), Color("ffcf3f"), Vector3.ZERO, 10)
-		for i in lv + 2:
-			var a2 := TAU * i / float(lv + 2) + 0.4
-			k.cylinder(Vector3(cos(a2) * 0.5, 0.35 + h * 0.4, sin(a2) * 0.5), 0.13, 0.05, Color("ffe066"), Vector3(30, rad_to_deg(a2), 0), 1.0, 8)
-	else:
-		k.cylinder(Vector3(0, 0.15 + h * 0.5, 0), 0.2, h, Color("d9b48f"), Vector3.ZERO, 1.0, 10)
-		var rings := int(h / 0.18)
-		for i in rings:
-			k.cylinder(Vector3(0, 0.25 + i * 0.18, 0), 0.215, 0.04, Color("b8916b"), Vector3.ZERO, 1.0, 10)
-		k.cylinder(Vector3(0, h + 0.15, 0), 0.6, 0.12, accent, Vector3.ZERO, 0.95, 14)
-		k.cylinder(Vector3(0, h + 0.2, 0), 0.55, 0.06, accent.lightened(0.3), Vector3.ZERO, 0.9, 14)
-	# level pips
-	for i in lv + 1:
-		var a3 := -PI * 0.5 + (i - lv * 0.5) * 0.45
-		k.sphere(Vector3(cos(a3) * 0.66, 0.18, -sin(a3) * 0.66 * -1.0), Vector3.ONE * 0.08, GameData.C_GOLD, Vector3.ZERO, 6)
-	if lv >= MAX_LEVEL and t != "fatcat":
-		# max level: a little golden flag
-		k.cylinder(Vector3(0.45, h + 0.6, 0.3), 0.02, 0.9, Color("6b5d73"))
-		k.box(Vector3(0.6, h + 0.95, 0.3), Vector3(0.3, 0.18, 0.02), GameData.C_GOLD)
-	var m := k.build()
-	_post_cache[key] = m
-	return m
-
-
-static func _weapon_mesh(t: String) -> ArrayMesh:
-	if _weapon_cache.has(t):
-		return _weapon_cache[t]
-	var k := MeshKit.new()
-	match t:
-		"yarn":
-			# basket of yarn
-			k.cylinder(Vector3(-0.38, 0.1, 0.05), 0.17, 0.18, Color("b07a4f"), Vector3.ZERO, 1.2, 8)
-			k.sphere(Vector3(-0.42, 0.22, 0.02), Vector3.ONE * 0.1, Color("ff5c8a"), Vector3.ZERO, 8)
-			k.sphere(Vector3(-0.32, 0.23, 0.1), Vector3.ONE * 0.09, Color("5dade2"), Vector3.ZERO, 8)
-		"fish":
-			# little cannon with a fish tail poking out
-			k.cylinder(Vector3(-0.32, 0.35, -0.2), 0.13, 0.55, Color("4a4e69"), Vector3(-60, 0, 0), 0.85, 10)
-			k.torus(Vector3(-0.32, 0.47, -0.4), 0.1, 0.16, Color("ffd23f"), Vector3(-60, 0, 0))
-			k.cylinder(Vector3(-0.32, 0.12, 0.0), 0.18, 0.14, Color("3a3d55"), Vector3.ZERO, 1.0, 8)
-			k.cone(Vector3(-0.32, 0.12, 0.12), 0.08, 0.12, Color("5dade2"), Vector3(90, 0, 0), 3)
-		"laser":
-			k.cylinder(Vector3(0.08, 0.32, -0.35), 0.035, 0.5, Color("30303a"), Vector3(-90, 0, 0), 1.0, 8)
-			k.sphere(Vector3(0.08, 0.32, -0.6), Vector3.ONE * 0.04, Color("ff2d55"), Vector3.ZERO, 6)
-			k.box(Vector3(0.08, 0.36, -0.3), Vector3(0.03, 0.03, 0.08), Color("ffd23f"))
-		"hiss":
-			# a megaphone
-			k.cone(Vector3(0, 0.62, -0.42), 0.16, 0.3, Color("7fd8ff"), Vector3(-90, 0, 0), 10)
-			k.cylinder(Vector3(0, 0.62, -0.28), 0.05, 0.1, Color("30303a"), Vector3(-90, 0, 0))
+## Stacks tower pieces for the current level and puts the kitten on top.
+func _rebuild_stack() -> void:
+	for c in _stack.get_children():
+		c.queue_free()
+	var st: Dictionary = STYLE[type]
+	var pieces: Array = []
+	match type:
 		"fatcat":
-			k.box(Vector3(0.35, 0.05, -0.35), Vector3(0.22, 0.12, 0.16), Color("8b5e3c"))
-			k.box(Vector3(0.35, 0.13, -0.35), Vector3(0.06, 0.04, 0.17), GameData.C_GOLD)
-	var m := k.build()
-	_weapon_cache[t] = m
-	return m
+			pieces = ["tower-round-base"]
+		_:
+			pieces = [st.bottom]
+			if level >= 2:
+				pieces.append("tower-round-middle-a")
+			if level >= 1:
+				pieces.append("tower-round-top-a")
+	var y := 0.0
+	var heights := {"tower-round-base": 0.21, "tower-round-top-a": 0.5}
+	for p in pieces:
+		var n := _piece(p)
+		n.scale = Vector3.ONE * TS
+		n.position.y = y
+		_stack.add_child(n)
+		Toon.apply(n, true, true)
+		var h: float = heights.get(p, 0.6) * TS
+		# kittens stand inside the battlements, not on top of them
+		y += h if p != "tower-round-top-a" else 0.18 * TS
+	_top_y = y
+	if type == "fatcat":
+		_add_coin_pile()
+		_turn.position = Vector3(0, y, 0)
+		cat.base_scale = 0.75 + level * 0.1
+		cat.scale = Vector3.ONE * cat.base_scale
+	else:
+		_turn.position = Vector3(0, y, 0)
+	if level >= MAX_LEVEL:
+		_add_flag(y)
+
+
+func _add_coin_pile() -> void:
+	var k := MeshKit.new()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var n := 10 + level * 6
+	for i in n:
+		var a := rng.randf() * TAU
+		var r := rng.randf_range(0.0, 0.55)
+		k.cylinder(Vector3(cos(a) * r, 0.04 + rng.randf() * (0.1 + level * 0.05), sin(a) * r), 0.13, 0.04, GameData.C_GOLD,
+			Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-20, 20)), 1.0, 10)
+	var mi := MeshKit.instance(k.build(), _stack)
+	mi.position.y = _top_y
+	Toon.apply(mi, true, false, true)
+
+
+func _add_flag(y: float) -> void:
+	var k := MeshKit.new()
+	k.cylinder(Vector3(0, 0.6, 0), 0.03, 1.2, Color("6b5d73"))
+	k.box(Vector3(0.2, 1.05, 0), Vector3(0.38, 0.24, 0.03), GameData.C_GOLD)
+	k.sphere(Vector3(0, 1.22, 0), Vector3.ONE * 0.06, GameData.C_GOLD, Vector3.ZERO, 8)
+	var mi := MeshKit.instance(k.build(), _stack)
+	mi.position = Vector3(0.62, y, 0.45)
+	Toon.apply(mi, true, true, true)
 
 
 # ------------------------------------------------------------------ logic
 func _process(delta: float) -> void:
+	if game == null: # portrait / preview copies have no game to fight in
+		return
 	if jammed > 0.0:
 		jammed -= delta
 		_set_beams_visible(false)
@@ -324,7 +338,6 @@ func _fire() -> void:
 				var dmg := get_damage()
 				var crit := game.roll_crit()
 				game.spawn_projectile(self, _muzzle.global_position, targets[i], dmg * (2.5 if crit else 1.0), crit, "yarn", {"delay": i * 0.08})
-			cat.raise_paw()
 			cat.bounce(0.15)
 			Sfx.play("shoot_yarn", 1.1, 0.12)
 		"lob":
@@ -389,7 +402,6 @@ func _process_beam(delta: float) -> void:
 		_target = nt
 	if _target == null:
 		_set_beams_visible(false)
-		cat.look_forward()
 		return
 	_face(_target.global_position, delta)
 	var l := lvl()
@@ -417,7 +429,7 @@ func _process_beam(delta: float) -> void:
 		var b := _beams[i]
 		if i < targets.size():
 			var e: Enemy = targets[i]
-			var to := e.global_position + Vector3(0, 0.45 * e.size, 0)
+			var to := e.global_position + Vector3(0, 0.5 * e.height, 0)
 			_aim_beam(b, from, to, 1.0 + (_ramp - 1.0) * 0.6)
 			b.visible = true
 			var share := 1.0 if i == 0 else 0.5
@@ -426,7 +438,7 @@ func _process_beam(delta: float) -> void:
 		else:
 			b.visible = false
 	_beam_dot.visible = true
-	_beam_dot.global_position = _target.global_position + Vector3(0, 0.45 * _target.size, 0)
+	_beam_dot.global_position = _target.global_position + Vector3(0, 0.5 * _target.height, 0)
 	_beam_dot.scale = Vector3.ONE * (1.0 + sin(Time.get_ticks_msec() * 0.03) * 0.25) * (0.8 + _ramp * 0.3)
 	_beam_tick -= delta
 	if _beam_tick <= 0.0:
@@ -464,7 +476,7 @@ func jam(time: float) -> void:
 	cat.puff_up()
 	if _dizzy == null:
 		_dizzy = Node3D.new()
-		_dizzy.position = Vector3(0, _post_height() + 1.2, 0)
+		_dizzy.position = Vector3(0, _top_y + 1.4, 0)
 		add_child(_dizzy)
 		var k := MeshKit.new()
 		for i in 3:
@@ -481,8 +493,7 @@ func _dizzy_spin(delta: float) -> void:
 # --------------------------------------------------------------- upgrades
 func upgrade() -> void:
 	level += 1
-	_post_mi.mesh = _post_mesh(type, level)
-	_place_on_post()
+	_rebuild_stack()
 	pop()
 
 
@@ -491,6 +502,7 @@ func pop() -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "scale", Vector3.ONE, 0.6).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	cat.hop(4.0)
+	cat.gesture("gesture-positive")
 
 
 func payout() -> int:
@@ -498,4 +510,5 @@ func payout() -> int:
 		return 0
 	cat.hop(3.0)
 	cat.bounce(0.3)
+	cat.gesture("dance", "idle", 1.5)
 	return get_income()

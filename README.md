@@ -4,11 +4,11 @@
 
 Your cat lives at the top of a tower. The neighborhood pack wants in. Build a squad of kittens along the road, upgrade them, grab perks between waves, and keep all nine lives.
 
-## Download
+## Download & play
 
-**Windows:** [TowerTiles-Windows.zip](https://github.com/AhmadNasserx/tower-tiles/raw/main/downloads/TowerTiles-Windows.zip) (about 39 MB). Unzip it and run `TowerTiles.exe`. It is a single file, with nothing to install. Windows may show a SmartScreen warning because the exe is not code-signed; choose *More info → Run anyway*.
-
-Every tagged version is also published on the [Releases page](https://github.com/AhmadNasserx/tower-tiles/releases), with the Windows build and an HTML5 build (`TowerTiles-Web.zip`) that you can upload straight to itch.io.
+- **Play in your browser:** https://ahmadnasserx.github.io/tower-tiles/ (works on phones too).
+- **Windows:** [TowerTiles-Windows.zip](https://github.com/AhmadNasserx/tower-tiles/releases/latest/download/TowerTiles-Windows.zip) (about 39 MB). Unzip it and run `TowerTiles.exe`. It is a single file, with nothing to install. Windows may show a SmartScreen warning because the exe is not code-signed; choose *More info → Run anyway*.
+- **All versions:** the [Releases page](https://github.com/AhmadNasserx/tower-tiles/releases) has every build, plus an HTML5 build (`TowerTiles-Web.zip`) that you can upload straight to itch.io.
 
 ![Defending the Backyard with a squad of upgraded kittens](docs/screenshot.png)
 
@@ -98,7 +98,6 @@ shaders/    toon + outline shaders
 assets/     models/ (Kenney), ui/ (Kenney + SVG icons), fonts/
 scenes/     main_menu + game scenes
 audio/      synthesized sfx (.wav) and music (.ogg)
-downloads/  the packaged Windows build (TowerTiles-Windows.zip)
 tools/      gen_audio.py: regenerates all audio (python3 + numpy + ffmpeg)
 ```
 

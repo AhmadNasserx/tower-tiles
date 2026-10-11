@@ -8,6 +8,8 @@ Your cat lives at the top of a tower. The neighborhood pack wants in. Build a sq
 
 **Windows:** [TowerTiles-Windows.zip](https://github.com/AhmadNasserx/tower-tiles/raw/main/downloads/TowerTiles-Windows.zip) (about 39 MB). Unzip it and run `TowerTiles.exe`. It is a single file, with nothing to install. Windows may show a SmartScreen warning because the exe is not code-signed; choose *More info → Run anyway*.
 
+Every tagged version is also published on the [Releases page](https://github.com/AhmadNasserx/tower-tiles/releases), with the Windows build and an HTML5 build (`TowerTiles-Web.zip`) that you can upload straight to itch.io.
+
 ![Defending the Backyard with a squad of upgraded kittens](docs/screenshot.png)
 
 | | |

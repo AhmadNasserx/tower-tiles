@@ -414,7 +414,7 @@ func _process(delta: float) -> void:
 	var b: Enemy = game.boss
 	_boss_box.visible = b != null and is_instance_valid(b) and b.alive
 	if _boss_box.visible:
-		_boss_name.text = b.def.name.to_upper()
+		UIKit.ribbon_set_text(_boss_name, b.def.name.to_upper())
 		_update_boss_bar(b)
 
 	_paw_dial.fraction = clampf(game.paw_cd / game.paw_cooldown_total(), 0.0, 1.0)
@@ -581,7 +581,7 @@ func flash_damage() -> void:
 ## that the ribbon sets the style.
 func banner(title: String, sub: String, hold_or_color: Variant = 1.6, hold := -1.0) -> void:
 	var h: float = hold if hold > 0.0 else (hold_or_color if hold_or_color is float else 1.6)
-	_banner_title.text = title.to_upper()
+	UIKit.ribbon_set_text(_banner_title, title.to_upper())
 	_banner_sub.text = sub
 	_banner_sub.visible = sub != ""
 	if _banner_tween:

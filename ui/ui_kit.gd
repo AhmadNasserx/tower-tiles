@@ -7,6 +7,17 @@ const DISPLAY := preload("res://assets/fonts/LilitaOne-Regular.ttf")
 const BODY_FILE := preload("res://assets/fonts/Fredoka.ttf")
 const UI := "res://assets/ui/"
 
+## Ribbon geometry, measured from banner_hanging.png (512x128, texture margin 40).
+## Left/right: the red band is symmetric (x 8..503), so both sides are 56.
+## Top/bottom: at the centre column the band runs from y=19 (its top, under the
+## pins) down to y=121, so it sits 19 px from the top edge and 7 px from the
+## bottom edge. The art has no tails hanging below, so the band is not centred
+## vertically in the panel. Its centre is 6 px below the panel's centre, and the
+## title's content box must shift down by the same amount: top - bottom = 12.
+## top + bottom = 44 keeps the panel height the same as it was before.
+const RIBBON_MARGINS := Vector4(56, 28, 56, 16)
+const RIBBON_OUTLINE := 8
+
 # UI palette
 const INK := Color("4a2c1d") # text on parchment
 const INK_SOFT := Color("8a6a54")
@@ -306,12 +317,47 @@ static func portrait(key: String, size := 64.0) -> TextureRect:
 	return i
 
 
-## Hanging ribbon banner with a title on it.
+## Hanging ribbon banner with a title on it (see RIBBON_MARGINS for the geometry).
 static func ribbon(text: String, size := 34, width := 420.0) -> Control:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", sbox("banner_hanging.png", 40, Vector4(56, 14, 56, 30)))
-	p.custom_minimum_size.x = width
-	var l := label(text, size, CREAM, 8, true)
+	p.add_theme_stylebox_override("panel", sbox("banner_hanging.png", 40, RIBBON_MARGINS))
+	p.set_meta("ribbon_size", size)
+	p.set_meta("ribbon_width", width)
+	var l := label(text, size, CREAM, RIBBON_OUTLINE, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.clip_text = true
+	l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	p.add_child(l)
+	_fit_ribbon(p)
 	return p
+
+
+## Changes a ribbon's title (the Label returned as its child) and re-fits it.
+static func ribbon_set_text(l: Label, text: String) -> void:
+	if l.text == text:
+		return
+	l.text = text
+	var p := l.get_parent() as PanelContainer
+	if p:
+		_fit_ribbon(p)
+
+
+## Shrinks the title font (down to 60% of its base size) until it fits the
+## ribbon's width. If it still does not fit, the ribbon grows to fit the text
+## instead of spilling out of the frame.
+static func _fit_ribbon(p: PanelContainer) -> void:
+	var l := p.get_child(0) as Label
+	var base_fs: int = p.get_meta("ribbon_size")
+	var width: float = p.get_meta("ribbon_width")
+	var pad: float = RIBBON_MARGINS.x + RIBBON_MARGINS.z + 2.0 * RIBBON_OUTLINE
+	var min_fs := int(round(base_fs * 0.6))
+	var fs := base_fs
+	while fs > min_fs and DISPLAY.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > width - pad:
+		fs -= 1
+	l.label_settings.font_size = fs
+	var text_w := DISPLAY.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	p.custom_minimum_size.x = maxf(width, text_w + pad)

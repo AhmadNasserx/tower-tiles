@@ -4,6 +4,10 @@
 
 Your cat lives at the top of a tower. The neighborhood pack wants in. Build a squad of kittens along the road, upgrade them, grab perks between waves, and keep all nine lives.
 
+## Download
+
+**Windows:** [TowerTiles-Windows.zip](https://github.com/AhmadNasserx/tower-tiles/raw/main/downloads/TowerTiles-Windows.zip) (about 39 MB). Unzip it and run `TowerTiles.exe`. It is a single file, with nothing to install. Windows may show a SmartScreen warning because the exe is not code-signed; choose *More info → Run anyway*.
+
 ![Gameplay](docs/screenshot.png)
 ![Kittens and critters up close](docs/closeup.png)
 
@@ -85,6 +89,7 @@ shaders/    toon + outline shaders
 assets/     models/ (Kenney), ui/ (Kenney + SVG icons), fonts/
 scenes/     main_menu + game scenes
 audio/      synthesized sfx (.wav) and music (.ogg)
+downloads/  the packaged Windows build (TowerTiles-Windows.zip)
 tools/      gen_audio.py: regenerates all audio (python3 + numpy + ffmpeg)
 ```
 

@@ -153,7 +153,7 @@ func _open_panel(title: String, sub := "", min_width := 0.0) -> VBoxContainer:
 	rb.z_index = 1
 	outer.add_child(rb)
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UIKit.sbox("panel_brown.png", 22, Vector4(30, 34, 30, 26)))
+	panel.add_theme_stylebox_override("panel", UIKit.modal_panel())
 	panel.custom_minimum_size.x = min_width
 	outer.add_child(panel)
 	var v := UIKit.vbox(14)
@@ -162,7 +162,7 @@ func _open_panel(title: String, sub := "", min_width := 0.0) -> VBoxContainer:
 		var s := UIKit.label(sub, 17, UIKit.INK_SOFT)
 		s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(s)
-	UIKit.pop_in(outer)
+	UIKit.fade_scale_in(outer)
 	return v
 
 

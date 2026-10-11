@@ -30,9 +30,11 @@ var _sel_extra: Label
 var _sel_upgrade: Button
 var _sel_target: Button
 var _sel_sell: Button
-var _boss_box: VBoxContainer
+var _boss_box: PanelContainer
+var _boss_style: StyleBoxFlat
 var _boss_name: Label
 var _boss_bar: TextureProgressBar
+var _boss_hp_label: Label
 var _banner: VBoxContainer
 var _banner_ribbon: PanelContainer
 var _banner_title: Label
@@ -162,13 +164,30 @@ func _build_top_center() -> void:
 	pv.add_child(_preview)
 	box.add_child(_preview_panel)
 
-	_boss_box = UIKit.vbox(0)
+	# dark backing card; its shadow is the red glow that pulses when the boss is nearly dead
+	_boss_style = StyleBoxFlat.new()
+	_boss_style.bg_color = Color(0.17, 0.1, 0.06, 0.9)
+	_boss_style.set_corner_radius_all(16)
+	_boss_style.set_border_width_all(3)
+	_boss_style.border_color = Color("2b1a10")
+	_boss_style.content_margin_left = 18.0
+	_boss_style.content_margin_right = 18.0
+	_boss_style.content_margin_top = 10.0
+	_boss_style.content_margin_bottom = 12.0
+	_boss_style.shadow_size = 22
+	_boss_style.shadow_offset = Vector2.ZERO
+	_boss_style.shadow_color = Color(UIKit.RED, 0.0)
+	_boss_box = PanelContainer.new()
+	_boss_box.add_theme_stylebox_override("panel", _boss_style)
 	_boss_box.visible = false
 	_boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var inner := UIKit.vbox(4)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_box.add_child(inner)
 	var ribbon := UIKit.ribbon("BOSS", 26, 400)
 	_boss_name = ribbon.get_child(0)
 	ribbon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_boss_box.add_child(ribbon)
+	inner.add_child(ribbon)
 	_boss_bar = TextureProgressBar.new()
 	_boss_bar.texture_under = UIKit.tex("progress_transparent.png")
 	_boss_bar.texture_progress = UIKit.tex("progress_red.png")
@@ -179,7 +198,14 @@ func _build_top_center() -> void:
 	_boss_bar.stretch_margin_bottom = 14
 	_boss_bar.custom_minimum_size = Vector2(340, 26)
 	_boss_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_boss_box.add_child(_boss_bar)
+	inner.add_child(_boss_bar)
+	# "cur / max" readout sits on the bar itself
+	_boss_hp_label = UIKit.label("", 16, UIKit.CREAM, 6, true)
+	_boss_hp_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_boss_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_boss_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_boss_bar.add_child(_boss_hp_label)
 	box.add_child(_boss_box)
 
 	_toasts = UIKit.vbox(2)
@@ -389,8 +415,7 @@ func _process(delta: float) -> void:
 	_boss_box.visible = b != null and is_instance_valid(b) and b.alive
 	if _boss_box.visible:
 		_boss_name.text = b.def.name.to_upper()
-		_boss_bar.max_value = b.max_hp
-		_boss_bar.value = b.hp
+		_update_boss_bar(b)
 
 	_paw_dial.fraction = clampf(game.paw_cd / game.paw_cooldown_total(), 0.0, 1.0)
 	_paw_dial.seconds = game.paw_cd
@@ -410,6 +435,21 @@ func _process(delta: float) -> void:
 	if _tutorial_step == 0 and game.turrets.size() > 0:
 		_set_tutorial(1)
 	game.overlay.coin_target = _gold_icon.global_position + _gold_icon.size * 0.5
+
+
+## Keeps the boss bar, its "cur / max" readout and the glow in step with the boss.
+## Under a quarter health the card pulses red so the turning point is obvious.
+func _update_boss_bar(b: Enemy) -> void:
+	_boss_bar.max_value = b.max_hp
+	_boss_bar.value = b.hp
+	_boss_hp_label.text = "%d / %d" % [ceili(b.hp), ceili(b.max_hp)]
+	if b.hp < b.max_hp * 0.25:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+		_boss_style.shadow_color = Color(UIKit.RED, 0.2 + 0.5 * pulse)
+		_boss_bar.modulate = Color.WHITE.lerp(Color(1.0, 0.5, 0.5), pulse)
+	elif _boss_style.shadow_color.a > 0.0:
+		_boss_style.shadow_color = Color(UIKit.RED, 0.0)
+		_boss_bar.modulate = Color.WHITE
 
 
 func _rebuild_preview() -> void:
@@ -507,9 +547,12 @@ func _refresh_selection_buttons() -> void:
 # ------------------------------------------------------------------ reactions
 func _on_lives_changed(lives: int, max_lives: int) -> void:
 	_lives_label.text = "%d/%d" % [lives, max_lives]
-	if _last_lives >= 0 and lives < _last_lives:
-		_punch(_lives_icon, 1.6)
-		_punch(_lives_label, 1.4)
+	if _last_lives >= 0 and lives != _last_lives:
+		if lives < _last_lives:
+			_punch(_lives_icon, 1.6)
+			_punch(_lives_label, 1.4)
+		else:
+			_punch(_lives_label, 1.25)
 	_last_lives = lives
 
 
@@ -675,14 +718,21 @@ func _open_modal(title := "", width := 0.0) -> VBoxContainer:
 		rb.z_index = 1
 		outer.add_child(rb)
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UIKit.sbox("panel_brown.png", 22, Vector4(30, 34, 30, 26)))
+	panel.add_theme_stylebox_override("panel", UIKit.modal_panel())
 	panel.custom_minimum_size.x = width
 	outer.add_child(panel)
-	var v := UIKit.vbox(12)
+	var v := UIKit.vbox(14)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(v)
-	UIKit.pop_in(outer)
+	UIKit.fade_scale_in(outer)
 	return v
+
+
+## Button for the bottom row of an end-of-run modal, all the same size.
+func _modal_button(text: String, cb: Callable, color: String) -> Button:
+	var b := UIKit.button(text, cb, 22, color)
+	b.custom_minimum_size = Vector2(200, 58)
+	return b
 
 
 func _close_modal() -> void:
@@ -819,12 +869,12 @@ func show_victory(stars: int, fish: int) -> void:
 	v.add_child(_fish_row(fish))
 	var buttons := UIKit.hbox(12)
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	buttons.add_child(UIKit.button("Endless Mode", func():
+	buttons.add_child(_modal_button("Endless Mode", func():
 		_close_modal()
 		get_tree().paused = false
 		game.continue_endless()
-		banner("Endless", "How long can your cat hold out?", 1.6), 20, "blue"))
-	buttons.add_child(UIKit.button("Main Menu", func(): game.quit_to_menu(), 20, "yellow"))
+		banner("Endless", "How long can your cat hold out?", 1.6), "blue"))
+	buttons.add_child(_modal_button("Main Menu", func(): game.quit_to_menu(), "yellow"))
 	v.add_child(buttons)
 
 
@@ -838,8 +888,8 @@ func show_defeat(fish: int) -> void:
 	v.add_child(_center(UIKit.label("Spend fish in the Cat Tree to grow stronger!", 16, UIKit.INK_SOFT)))
 	var buttons := UIKit.hbox(12)
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-	buttons.add_child(UIKit.button("Try Again", func(): game.restart(), 22, "green"))
-	buttons.add_child(UIKit.button("Cat Tree", func(): game.quit_to_menu(), 22, "yellow"))
+	buttons.add_child(_modal_button("Try Again", func(): game.restart(), "green"))
+	buttons.add_child(_modal_button("Cat Tree", func(): game.quit_to_menu(), "yellow"))
 	v.add_child(buttons)
 
 

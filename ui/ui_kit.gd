@@ -189,31 +189,58 @@ static func button(text: String, callback: Callable, size := 22, color := "yello
 	return b
 
 
-## Hover bounce, press squish and sounds for any Control that has mouse signals.
+## Hover bounce, press squash and sounds for any Control that has mouse signals.
+## Every move goes through _scale_to, so a new move cancels the tween still
+## running and quick hover in/out never fights itself. Touch taps usually emulate
+## a mouse, so they get the same bounce as a hover.
 static func juicy(c: Control, hover_scale := 1.06) -> void:
 	c.mouse_entered.connect(func():
 		if c is BaseButton and (c as BaseButton).disabled:
 			return
-		_pivot(c)
 		Sfx.play("hover", 1.0, 0.1)
-		var tw := c.create_tween().set_ignore_time_scale(true)
-		tw.tween_property(c, "scale", Vector2.ONE * hover_scale, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+		_scale_to(c, Vector2.ONE * hover_scale, 0.12, Tween.TRANS_BACK))
 	c.mouse_exited.connect(func():
-		var tw := c.create_tween().set_ignore_time_scale(true)
-		tw.tween_property(c, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT))
+		_scale_to(c, Vector2.ONE, 0.15, Tween.TRANS_QUAD))
 	if c is BaseButton:
 		(c as BaseButton).button_down.connect(func():
-			_pivot(c)
-			c.scale = Vector2(hover_scale + 0.05, hover_scale - 0.08))
+			_scale_to(c, Vector2(hover_scale + 0.05, hover_scale - 0.08), 0.06, Tween.TRANS_QUAD))
 		(c as BaseButton).pressed.connect(func():
 			Sfx.play("click", 1.0, 0.05)
-			var tw := c.create_tween().set_ignore_time_scale(true)
-			tw.tween_property(c, "scale", Vector2.ONE * hover_scale, 0.35).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT))
+			_scale_to(c, Vector2.ONE * hover_scale, 0.35, Tween.TRANS_ELASTIC))
 	c.resized.connect(func(): _pivot(c))
+
+
+## One scale tween per control, real-time (ignores slow-mo and pause scaling).
+static func _scale_to(c: Control, target: Vector2, dur: float, trans: Tween.TransitionType) -> void:
+	_pivot(c)
+	if c.has_meta("juicy_tw"):
+		var old: Variant = c.get_meta("juicy_tw")
+		if old is Tween and (old as Tween).is_valid():
+			(old as Tween).kill()
+	var tw := c.create_tween().set_ignore_time_scale(true)
+	tw.tween_property(c, "scale", target, dur).set_trans(trans).set_ease(Tween.EASE_OUT)
+	c.set_meta("juicy_tw", tw)
 
 
 static func _pivot(c: Control) -> void:
 	c.pivot_offset = c.size * 0.5
+
+
+## Gentle modal entrance: fades in while easing up from a slight shrink, no
+## bounce. Real-time, so it still plays while the game is paused or slowed.
+static func fade_scale_in(c: Control, start_scale := 0.94, dur := 0.22) -> void:
+	_pivot(c)
+	c.resized.connect(func(): _pivot(c))
+	c.scale = Vector2.ONE * start_scale
+	c.modulate.a = 0.0
+	var tw := c.create_tween().set_ignore_time_scale(true)
+	tw.tween_property(c, "modulate:a", 1.0, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(c, "scale", Vector2.ONE, dur + 0.06).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## The parchment card behind modal and panel content, so they all share margins.
+static func modal_panel() -> StyleBoxTexture:
+	return sbox("panel_brown.png", 22, Vector4(30, 34, 30, 26))
 
 
 static func pop_in(c: Control, delay := 0.0) -> void:

@@ -8,8 +8,12 @@ Your cat lives at the top of a tower. The neighborhood pack wants in. Build a sq
 
 **Windows:** [TowerTiles-Windows.zip](https://github.com/AhmadNasserx/tower-tiles/raw/main/downloads/TowerTiles-Windows.zip) (about 39 MB). Unzip it and run `TowerTiles.exe`. It is a single file, with nothing to install. Windows may show a SmartScreen warning because the exe is not code-signed; choose *More info → Run anyway*.
 
-![Gameplay](docs/screenshot.png)
-![Kittens and critters up close](docs/closeup.png)
+![Defending the Backyard with a squad of upgraded kittens](docs/screenshot.png)
+
+| | |
+| --- | --- |
+| ![Big Ellie's boss reveal: the camera swoops to a front-on close-up](docs/boss.png) | ![Fenn the fox runs the Cat Tree shop](docs/shop.png) |
+| ![The Garden Maze mid-wave](docs/maze.png) | ![Main menu with a live battle behind it](docs/menu.png) |
 
 ## How to play
 

@@ -5,15 +5,36 @@ extends CanvasLayer
 
 const SettingsPanel := preload("res://ui/settings_panel.gd")
 const Dial := preload("res://ui/cooldown_dial.gd")
+const SEL_MARGIN := 16.0 # gap between the selection panel and the right edge
+const SEL_SLIDE := 340.0 # how far off-screen the selection panel starts its slide-in
+## Touch scale caps per widget. The touch scale itself follows the real window size (see
+## UIKit.touch_scale); these stop the big pieces from crowding the screen on small phones.
+const CARD_MAX_K := 1.35 # kitten cards (the bar sits at the bottom, so they cost height)
+const SEL_MAX_K := 1.45 # selection panel text and portraits
+const SEL_TOUCH_W := 460.0 # selection panel width on touch (desktop keeps 290)
+
+## Emitted when the first screen touch turns the touch layout on (see _input).
+signal touch_mode_changed
 
 var game: Game
 
 var root: Control
+var _build_panel: PanelContainer # the card bar at the bottom centre
+var _bottom_column: VBoxContainer # the Cancel row (touch, in build mode) above the card bar
+var _cancel_row: HBoxContainer # the touch-only "Cancel" button, above the card bar
+var _cancel_btn: Button
+var _square_btns: Array[Button] = [] # square icon buttons, sized for touch
+var _fs_btn: Button
+var _fs_glyph: Control
+var _pause_fs_btn: Button # the pause menu's full screen entry, while it is open
+var _abilities: Array = [] # {button, icon, key} per ability button
+var _sel_grid: GridContainer # Upgrade, Target, Move, Sell: one column on desktop, two on touch
 var _lives_label: Label
 var _lives_icon: Control
 var _gold_label: Label
 var _gold_icon: Control
 var _wave_label: Label
+var _top_box: VBoxContainer # the start-wave button, preview chips and toasts, top centre
 var _wave_btn: Button
 var _preview: HBoxContainer
 var _preview_panel: PanelContainer
@@ -29,7 +50,9 @@ var _sel_stats: Label
 var _sel_extra: Label
 var _sel_upgrade: Button
 var _sel_target: Button
+var _sel_move: Button
 var _sel_sell: Button
+var _sel_tw: Tween # the selection panel's slide-in or fade-out
 var _boss_box: PanelContainer
 var _boss_style: StyleBoxFlat
 var _boss_name: Label
@@ -51,6 +74,9 @@ var _zoom_tint: TextureRect
 var _modal: Control
 var _hint: PanelContainer
 var _hint_label: Label
+var _hint_preset := Control.PRESET_CENTER_BOTTOM
+var _hint_offset: Callable # the hint's lift from its preset, read again on every placement
+var _hint_shift_seen := 0.0 # the sideways shift the hint was last placed with
 var _tutorial_step := -1
 var _shown_gold := -1
 var _last_lives := -1
@@ -81,11 +107,20 @@ func _ready() -> void:
 	_build_selection_panel()
 	_build_banner()
 	_build_hint()
+	_apply_touch()
+	touch_mode_changed.connect(_apply_touch)
+	# a rotation or window resize changes the real px per logical px, so the sizes follow.
+	# Deferred, so it runs after the stretch has updated the viewport.
+	get_viewport().size_changed.connect(_apply_touch, CONNECT_DEFERRED)
+	UIKit.make_rotate_overlay(self)
 
 	game.gold_changed.connect(func(_g): _refresh_cards())
 	game.lives_changed.connect(_on_lives_changed)
 	game.selection_changed.connect(_on_selection_changed)
-	game.build_mode_changed.connect(func(_t): _refresh_cards())
+	game.selection_changed.connect(func(_t): _refresh_cancel())
+	game.build_mode_changed.connect(func(_t):
+		_refresh_cards()
+		_refresh_cancel())
 	game.wave_changed.connect(_on_wave_changed)
 	_refresh_cards()
 	if not Save.settings.tutorial_done:
@@ -93,11 +128,24 @@ func _ready() -> void:
 	banner(game.map.name, "Keep your cat safe. Don't let the pack reach the tower!", 2.6)
 
 
+## The first screen touch on a device the probe missed turns the touch layout on.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed and not UIKit.is_touch():
+		UIKit.touch_seen = true
+		touch_mode_changed.emit()
+
+
 # ------------------------------------------------------------------ layout
 func _anchored(c: Control, preset: Control.LayoutPreset, offset := Vector2.ZERO) -> Control:
 	_gameplay.add_child(c)
 	c.set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, 10)
 	c.position += offset
+	# on the bottom or right edge, grow back towards the middle when the minimum size
+	# changes (touch sizes), so the control never runs off the screen
+	if preset in [Control.PRESET_BOTTOM_LEFT, Control.PRESET_CENTER_BOTTOM, Control.PRESET_BOTTOM_RIGHT]:
+		c.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	if preset in [Control.PRESET_TOP_RIGHT, Control.PRESET_BOTTOM_RIGHT, Control.PRESET_CENTER_RIGHT]:
+		c.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	return c
 
 
@@ -146,9 +194,17 @@ func _build_top_left() -> void:
 	_gold_label = gold[1]
 	_gold_icon = gold[2]
 	_gold_label.custom_minimum_size.x = 64
-	_anchored(panel, Control.PRESET_TOP_LEFT)
+	# the stats plate and the wave counter share a column, so the counter moves down with the plate
+	var plate := UIKit.vbox(4)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(panel)
 	_wave_label = UIKit.label("WAVE 0/20", 22, UIKit.CREAM, 8, true)
-	_anchored(_wave_label, Control.PRESET_TOP_LEFT, Vector2(14, 66))
+	var wave_row := MarginContainer.new()
+	wave_row.add_theme_constant_override("margin_left", 14)
+	wave_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wave_row.add_child(_wave_label)
+	plate.add_child(wave_row)
+	_anchored(plate, Control.PRESET_TOP_LEFT)
 
 
 func _build_top_center() -> void:
@@ -221,6 +277,7 @@ func _build_top_center() -> void:
 	_toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(_toasts)
 
+	_top_box = box
 	_anchored(box, Control.PRESET_CENTER_TOP)
 	box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	box.resized.connect(func(): box.position.x = (root.size.x - box.size.x) * 0.5)
@@ -231,10 +288,12 @@ func _square_button(icon_kind: String, cb: Callable, tip: String) -> Button:
 	UIKit.style_button(b, "yellow", true)
 	b.custom_minimum_size = Vector2(58, 58)
 	b.icon = UIKit._scaled_icon(icon_kind, 30)
+	b.set_meta("icon_kind", icon_kind) # _apply_touch redraws the icon at the touch size
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.tooltip_text = tip
 	b.pressed.connect(cb)
 	UIKit.juicy(b, 1.1)
+	_square_btns.append(b)
 	return b
 
 
@@ -249,14 +308,49 @@ func _build_top_right() -> void:
 	UIKit.juicy(_speed_btn, 1.1)
 	row.add_child(_speed_btn)
 	row.add_child(_square_button("pause", toggle_pause, "Pause (Esc)"))
+	_fs_btn = _fullscreen_button()
+	row.add_child(_fs_btn)
 	_anchored(row, Control.PRESET_TOP_RIGHT)
 
 
+## Square full screen toggle. The brackets turn inwards while the window is full screen.
+func _fullscreen_button() -> Button:
+	var b := Button.new()
+	UIKit.style_button(b, "yellow", true)
+	b.custom_minimum_size = Vector2(58, 58)
+	b.tooltip_text = "Full screen"
+	b.pressed.connect(_toggle_fullscreen)
+	UIKit.juicy(b, 1.1)
+	_fs_glyph = UIKit.fullscreen_glyph(_is_fullscreen)
+	b.add_child(_fs_glyph)
+	_square_btns.append(b)
+	return b
+
+
+func _is_fullscreen() -> bool:
+	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+
+
+## Switches between full screen and a window. Works from a tap on the web build.
+func _toggle_fullscreen() -> void:
+	var to_full := not _is_fullscreen()
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if to_full else DisplayServer.WINDOW_MODE_WINDOWED)
+	_fs_glyph.queue_redraw()
+	_fs_btn.tooltip_text = _fs_text(to_full)
+	if is_instance_valid(_pause_fs_btn):
+		_pause_fs_btn.text = _fs_text(to_full)
+	Sfx.play("click")
+
+
+func _fs_text(full: bool) -> String:
+	return "Exit full screen" if full else "Full screen"
+
+
 func _build_build_bar() -> void:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UIKit.wood())
+	_build_panel = PanelContainer.new()
+	_build_panel.add_theme_stylebox_override("panel", UIKit.wood())
 	var row := UIKit.hbox(8)
-	panel.add_child(row)
+	_build_panel.add_child(row)
 	for type in GameData.TURRET_ORDER:
 		var d: Dictionary = GameData.TURRETS[type]
 		var b := Button.new()
@@ -278,7 +372,8 @@ func _build_build_bar() -> void:
 		v.add_child(nm)
 		var cost_row := UIKit.hbox(3)
 		cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
-		cost_row.add_child(UIKit.icon("coin", Color.WHITE, 20))
+		var coin := UIKit.icon("coin", Color.WHITE, 20)
+		cost_row.add_child(coin)
 		var cl := UIKit.label(str(d.cost), 19, UIKit.INK, 0, true)
 		cost_row.add_child(cl)
 		v.add_child(cost_row)
@@ -287,11 +382,25 @@ func _build_build_bar() -> void:
 		b.add_child(key)
 		UIKit.juicy(b, 1.07)
 		row.add_child(b)
-		_build_cards[type] = {"button": b, "cost": cl}
-	_anchored(panel, Control.PRESET_CENTER_BOTTOM)
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_build_cards[type] = {"button": b, "cost": cl, "pic": pic, "name": nm, "key": key, "coin": coin}
+	# the touch-only cancel sits in a column above the card bar, which stays put
+	_cancel_btn = UIKit.button("Cancel", func(): game._cancel(), 20, "red", "cross")
+	_cancel_btn.tooltip_text = "Leave build, paw or move mode (Esc)"
+	_cancel_row = UIKit.hbox(0)
+	_cancel_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_cancel_row.add_child(_cancel_btn)
+	_cancel_row.visible = false
+	var column := UIKit.vbox(8)
+	column.alignment = BoxContainer.ALIGNMENT_END
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_cancel_row)
+	column.add_child(_build_panel)
+	_bottom_column = column
+	_anchored(column, Control.PRESET_CENTER_BOTTOM)
+	column.grow_horizontal = Control.GROW_DIRECTION_BOTH
 
 
+## Returns [button, dial, icon, key label]. The key badge is hidden on touch.
 func _ability_button(icon_kind: String, key: String, tip: String, cb: Callable) -> Array:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(88, 88)
@@ -313,16 +422,18 @@ func _ability_button(icon_kind: String, key: String, tip: String, cb: Callable) 
 	k.position = Vector2(66, 60)
 	b.add_child(k)
 	UIKit.juicy(b, 1.1)
-	return [b, dial]
+	return [b, dial, ic, k]
 
 
 func _build_abilities() -> void:
 	var row := UIKit.hbox(10)
 	var paw := _ability_button("paw", "Q", "GIANT PAW  [Q]\nClick the road to squash critters and stun the survivors.", func(): game.begin_paw())
 	_paw_dial = paw[1]
+	_abilities.append({"button": paw[0], "icon": paw[2], "key": paw[3]})
 	row.add_child(paw[0])
 	var zoom := _ability_button("bolt", "E", "ZOOMIES  [E]\nEvery kitten (and your cat) attacks twice as fast for a few seconds.", func(): game.activate_zoomies())
 	_zoom_dial = zoom[1]
+	_abilities.append({"button": zoom[0], "icon": zoom[2], "key": zoom[3]})
 	row.add_child(zoom[0])
 	_anchored(row, Control.PRESET_BOTTOM_LEFT)
 
@@ -330,14 +441,14 @@ func _build_abilities() -> void:
 func _build_selection_panel() -> void:
 	_sel_panel = PanelContainer.new()
 	_sel_panel.custom_minimum_size = Vector2(290, 0)
-	var v := UIKit.vbox(6)
+	var v := UIKit.vbox(4)
 	_sel_panel.add_child(v)
 	var head := UIKit.hbox(8)
 	v.add_child(head)
 	_sel_portrait = TextureRect.new()
 	_sel_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_sel_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_sel_portrait.custom_minimum_size = Vector2(76, 76)
+	_sel_portrait.custom_minimum_size = Vector2(64, 64)
 	head.add_child(_sel_portrait)
 	var names := UIKit.vbox(0)
 	names.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -352,15 +463,151 @@ func _build_selection_panel() -> void:
 	v.add_child(_sel_stats)
 	_sel_extra = UIKit.label("", 14, UIKit.INK_SOFT)
 	v.add_child(_sel_extra)
+	# one column on desktop (as a stack); two columns on touch, so the panel stays short
+	_sel_grid = GridContainer.new()
+	_sel_grid.columns = 1
+	_sel_grid.add_theme_constant_override("h_separation", 6)
+	_sel_grid.add_theme_constant_override("v_separation", 4)
+	v.add_child(_sel_grid)
 	_sel_upgrade = UIKit.button("Upgrade", func(): game.upgrade_selected(), 20, "green", "up")
-	v.add_child(_sel_upgrade)
+	_sel_grid.add_child(_sel_upgrade)
 	_sel_target = UIKit.button("Target: First", func(): game.cycle_target_mode(), 17, "grey", "target")
 	_sel_target.tooltip_text = "Which critter to attack first (T)"
-	v.add_child(_sel_target)
+	_sel_grid.add_child(_sel_target)
+	_sel_move = UIKit.button("Move  [M]", func(): game.begin_move(), 17, "blue")
+	_sel_grid.add_child(_sel_move)
 	_sel_sell = UIKit.button("Sell", func(): game.sell_selected(), 17, "red", "sell")
-	v.add_child(_sel_sell)
-	_anchored(_sel_panel, Control.PRESET_CENTER_RIGHT)
+	_sel_grid.add_child(_sel_sell)
+	_gameplay.add_child(_sel_panel)
+	_place_selection()
 	_sel_panel.visible = false
+
+
+## Desktop: at the right edge, centred vertically. It grows leftwards when its content is
+## wider than the minimum, so the right edge never leaves the screen. Touch: it stands
+## on the card bar, so the tall panel never covers the cards. The slide-in moves only
+## the horizontal offsets, and they return to exactly this layout at rest.
+func _place_selection() -> void:
+	if UIKit.is_touch():
+		_sel_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		var lift := -(_build_panel.get_combined_minimum_size().y + 24.0)
+		_sel_panel.offset_top = lift
+		_sel_panel.offset_bottom = lift
+		_sel_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	else:
+		_sel_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+		_sel_panel.offset_top = 0.0
+		_sel_panel.offset_bottom = 0.0
+		_sel_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	# the preset derives offsets from the current rect, so all four are set explicitly
+	_sel_panel.offset_left = -SEL_MARGIN
+	_sel_panel.offset_right = -SEL_MARGIN
+	_sel_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+
+
+# ------------------------------------------------------------------ touch
+## Sizes and wording that depend on touch. Runs once the HUD is built, and again when
+## the first touch turns the touch layout on. Desktop gets back the sizes it always had.
+func _apply_touch() -> void:
+	var k := UIKit.touch_scale() # touch targets and labels; 1.0 on desktop
+	var ck := _card_k() # kitten cards and preview chips
+	var sk := _text_k() # selection panel, hint and wave counter
+	var touch := UIKit.is_touch()
+	# top left: the stats plate and the wave counter
+	_lives_icon.custom_minimum_size = Vector2(36, 36) * k
+	_gold_icon.custom_minimum_size = Vector2(36, 36) * k
+	_lives_label.label_settings.font_size = roundi(28 * k)
+	_gold_label.label_settings.font_size = roundi(28 * k)
+	_gold_label.custom_minimum_size.x = 64.0 * k
+	_wave_label.label_settings.font_size = roundi(22 * sk)
+	# top right: speed and square buttons, with the icons drawn at the same size
+	_speed_btn.custom_minimum_size = Vector2(76, 58) * k
+	_speed_btn.add_theme_font_size_override("font_size", roundi(24 * k))
+	for b in _square_btns:
+		b.custom_minimum_size = Vector2(58, 58) * k
+		if b.has_meta("icon_kind"):
+			b.icon = UIKit._scaled_icon(b.get_meta("icon_kind"), roundi(30 * k))
+	# top centre and bottom centre
+	_wave_btn.custom_minimum_size = Vector2(270, 56) * k
+	_wave_btn.add_theme_font_size_override("font_size", roundi(24 * k))
+	_cancel_btn.custom_minimum_size = Vector2(180, 56) * k
+	_cancel_btn.add_theme_font_size_override("font_size", roundi(20 * k))
+	for type in _build_cards:
+		var card: Dictionary = _build_cards[type]
+		card.button.custom_minimum_size = Vector2(108, 126) * ck
+		card.pic.custom_minimum_size = Vector2(72, 72) * ck
+		card.name.label_settings.font_size = roundi((16 if touch else 14) * ck)
+		card.cost.label_settings.font_size = roundi(19 * ck)
+		card.coin.custom_minimum_size = Vector2(20, 20) * ck
+		card.key.visible = not touch
+	for ab in _abilities:
+		var px := Vector2(88, 88) * k
+		ab.button.custom_minimum_size = px
+		var icon_px := 50.0 * k
+		ab.icon.custom_minimum_size = Vector2(icon_px, icon_px)
+		ab.icon.position = (px - Vector2(icon_px, icon_px)) * 0.5
+		ab.key.visible = not touch
+	# selection panel: a wide panel with tap-sized buttons, two to a row on touch
+	if touch:
+		_sel_panel.custom_minimum_size = Vector2(SEL_TOUCH_W, 0)
+		_sel_panel.add_theme_stylebox_override("panel", UIKit.sbox("panel_brown.png", 22, Vector4(16, 12, 16, 12)))
+	else:
+		_sel_panel.custom_minimum_size = Vector2(290, 0)
+		_sel_panel.remove_theme_stylebox_override("panel")
+	_sel_grid.columns = 2 if touch else 1
+	_sel_title.label_settings.font_size = roundi(26 * sk)
+	_sel_portrait.custom_minimum_size = Vector2(64, 64) * sk
+	for c in _sel_stars.get_children():
+		c.custom_minimum_size = Vector2(24, 24) * sk
+	_sel_stats.label_settings.font_size = roundi(16 * sk)
+	_sel_stats.custom_minimum_size.x = SEL_TOUCH_W - 40.0 if touch else 250.0
+	_sel_extra.label_settings.font_size = roundi((16 if touch else 14) * sk)
+	for b in [_sel_upgrade, _sel_target, _sel_move, _sel_sell]:
+		b.custom_minimum_size.y = UIKit.tap_min(0.0, 56.0 * k)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL if touch else Control.SIZE_FILL
+	_sel_upgrade.add_theme_font_size_override("font_size", roundi(20 * sk))
+	for b in [_sel_target, _sel_move, _sel_sell]:
+		b.add_theme_font_size_override("font_size", roundi(17 * sk))
+	_place_selection()
+	if game.selected and is_instance_valid(game.selected):
+		_sel_target.text = _target_label(game.selected)
+		_refresh_selection_buttons()
+	# the tutorial hint and the preview chips are placed or sized from the same scale
+	_hint_label.label_settings.font_size = roundi(18 * sk)
+	_hint_label.custom_minimum_size.x = 340.0 * sk
+	_preview_wave = -1 # the chips are rebuilt at the new size on the next frame
+	_refresh_cards()
+	_refresh_cancel()
+	_place_hint()
+
+
+## Scale for the kitten cards and preview chips: the touch scale, capped at CARD_MAX_K.
+func _card_k() -> float:
+	return minf(UIKit.touch_scale(), CARD_MAX_K)
+
+
+## Scale for panel text, the hint and the modal buttons: the touch scale, capped at SEL_MAX_K.
+func _text_k() -> float:
+	return minf(UIKit.touch_scale(), SEL_MAX_K)
+
+
+## The touch-only Cancel shows while a card, the paw or a move is waiting for a tap.
+## Esc and right-click do the same job on desktop.
+func _refresh_cancel() -> void:
+	var on := UIKit.is_touch() and game.mode in ["build", "paw", "move"]
+	if on == _cancel_row.visible:
+		return
+	_cancel_row.visible = on
+	_place_hint() # the bottom hint sits above the Cancel row too
+
+
+## Lift of the bottom-centre tutorial hints, clear of the card bar.
+func _bottom_lift() -> float:
+	return -(_bottom_column.get_combined_minimum_size().y + 24.0) if UIKit.is_touch() else -160.0
+
+
+func _target_label(t: Turret) -> String:
+	return "Target: %s%s" % [GameData.TARGET_MODES[t.target_mode], UIKit.hint("  [T]", "")]
 
 
 func _build_banner() -> void:
@@ -402,6 +649,7 @@ func _process(delta: float) -> void:
 		_gold_label.text = str(shown)
 	_wave_label.text = ("WAVE %d/%d" % [game.wave, GameData.WAVES_TO_WIN]) if not game.endless else ("WAVE %d  ENDLESS" % game.wave)
 	_speed_btn.text = "%dx" % int(Game.SPEEDS[game.speed_index])
+	_refresh_cancel() # the paw mode does not emit build_mode_changed, so it is polled
 
 	var can_start := not game.in_wave and game.playing
 	_wave_btn.visible = can_start
@@ -442,6 +690,9 @@ func _process(delta: float) -> void:
 
 	if _sel_panel.visible and game.selected and is_instance_valid(game.selected):
 		_refresh_selection_buttons()
+	# the selection panel opening or closing moves the hint sideways (see _hint_shift)
+	if _hint.visible and _hint_shift() != _hint_shift_seen:
+		_place_hint()
 	if _tutorial_step == 0 and game.turrets.size() > 0:
 		_set_tutorial(1)
 	game.overlay.coin_target = _gold_icon.global_position + _gold_icon.size * 0.5
@@ -471,9 +722,9 @@ func _rebuild_preview() -> void:
 		var chip := UIKit.hbox(0)
 		chip.tooltip_text = d.name
 		chip.mouse_filter = Control.MOUSE_FILTER_PASS
-		chip.add_child(UIKit.portrait("critter:" + type, 46))
+		chip.add_child(UIKit.portrait("critter:" + type, 46.0 * _card_k()))
 		var boss: bool = d.get("boss", false)
-		chip.add_child(UIKit.label("x%d" % summary[type], 20, UIKit.RED if boss else UIKit.INK, 0, true))
+		chip.add_child(UIKit.label("x%d" % summary[type], roundi(20 * _card_k()), UIKit.RED if boss else UIKit.INK, 0, true))
 		_preview.add_child(chip)
 
 
@@ -494,26 +745,32 @@ func _refresh_cards() -> void:
 		var afford := game.gold >= cost
 		var selected: bool = game.build_type == type
 		cl.label_settings.font_color = UIKit.INK if afford else UIKit.RED
-		var normal := UIKit.sbox("sq_yellow.png" if selected else "panel_brown.png", 20 if selected else 22, Vector4(8, 8, 8, 8))
-		if not afford and not selected:
-			normal.modulate_color = Color(0.8, 0.74, 0.7)
+		# the active card is yellow; a card the gold can't cover is dimmed (also on hover)
+		var lit := afford or selected
+		var dim := Color.WHITE if lit else Color(0.8, 0.74, 0.7)
+		var normal := UIKit.sbox("sq_yellow.png" if selected else "panel_brown.png", 20 if selected else 22, Vector4(8, 8, 8, 8), dim)
 		b.add_theme_stylebox_override("normal", normal)
-		b.add_theme_stylebox_override("hover", UIKit.sbox("sq_yellow.png", 20, Vector4(8, 8, 8, 8), Color(1.05, 1.05, 1.05)))
+		var hover_face := "sq_yellow.png" if lit else "panel_brown.png"
+		b.add_theme_stylebox_override("hover", UIKit.sbox(hover_face, 20 if lit else 22, Vector4(8, 8, 8, 8), Color(1.05, 1.05, 1.05) * dim))
 		b.add_theme_stylebox_override("pressed", UIKit.sbox("sq_yellow_pressed.png", 20, Vector4(8, 8, 8, 8)))
 		b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 		if selected:
 			b.pivot_offset = b.size * 0.5
 			b.scale = Vector2(1.08, 1.08)
+		elif not b.is_hovered():
+			b.scale = Vector2.ONE
 	if game.selected:
 		_refresh_selection_buttons()
 
 
 func _on_selection_changed(t: Turret) -> void:
+	if _sel_tw and _sel_tw.is_valid():
+		_sel_tw.kill()
 	if t == null:
 		if _sel_panel.visible:
-			var tw := create_tween().set_ignore_time_scale(true)
-			tw.tween_property(_sel_panel, "modulate:a", 0.0, 0.12)
-			tw.tween_callback(func(): _sel_panel.visible = game.selected != null)
+			_sel_tw = create_tween().set_ignore_time_scale(true)
+			_sel_tw.tween_property(_sel_panel, "modulate:a", 0.0, 0.12)
+			_sel_tw.tween_callback(func(): _sel_panel.visible = game.selected != null)
 		return
 	var was_hidden := not _sel_panel.visible
 	_sel_panel.visible = true
@@ -523,19 +780,29 @@ func _on_selection_changed(t: Turret) -> void:
 	for c in _sel_stars.get_children():
 		c.queue_free()
 	for i in Turret.MAX_LEVEL + 1:
-		_sel_stars.add_child(UIKit.icon("star" if i <= t.level else "star_empty", Color.WHITE, 24))
+		_sel_stars.add_child(UIKit.icon("star" if i <= t.level else "star_empty", Color.WHITE, 24.0 * _text_k()))
 	_sel_stats.text = t.describe_stats()
 	if t.def.kind == "income":
 		_sel_extra.text = "Snoozing. Pays out when a wave ends."
 	else:
 		_sel_extra.text = "Bonks: %d    Damage: %d" % [t.kills, int(t.damage_done)]
 	_sel_target.visible = not (t.def.kind in ["income", "pulse"])
-	_sel_target.text = "Target: %s  [T]" % GameData.TARGET_MODES[t.target_mode]
+	_sel_target.text = _target_label(t)
 	_refresh_selection_buttons()
 	if was_hidden:
-		var x := _sel_panel.position.x
-		_sel_panel.position.x += 340
-		create_tween().set_ignore_time_scale(true).tween_property(_sel_panel, "position:x", x, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_slide_in_selection()
+
+
+## Slides the panel in from the right by moving its offsets, then lands it on the
+## anchored layout. Nothing is left modified once the tween has finished.
+func _slide_in_selection() -> void:
+	if _sel_tw and _sel_tw.is_valid():
+		_sel_tw.kill()
+	_sel_panel.offset_left = -SEL_MARGIN + SEL_SLIDE
+	_sel_panel.offset_right = -SEL_MARGIN + SEL_SLIDE
+	_sel_tw = create_tween().set_ignore_time_scale(true).set_parallel()
+	_sel_tw.tween_property(_sel_panel, "offset_left", -SEL_MARGIN, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_sel_tw.tween_property(_sel_panel, "offset_right", -SEL_MARGIN, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _refresh_selection_buttons() -> void:
@@ -547,9 +814,16 @@ func _refresh_selection_buttons() -> void:
 		_sel_upgrade.disabled = true
 	else:
 		var cost := t.upgrade_cost()
-		_sel_upgrade.text = "Upgrade  %d  [U]" % cost
+		_sel_upgrade.text = "Upgrade  %d%s" % [cost, UIKit.hint("  [U]", "")]
 		_sel_upgrade.disabled = game.gold < cost
-	_sel_sell.text = "Sell  +%d  [X]" % t.sell_value()
+	# moving is free, but only between waves
+	_sel_move.text = ("Cancel Move" if game.mode == "move" else "Move") + UIKit.hint("  [M]", "")
+	_sel_move.disabled = game.in_wave or not game.playing
+	if _sel_move.disabled:
+		_sel_move.tooltip_text = "Kittens can only be moved between waves"
+	else:
+		_sel_move.tooltip_text = "Pick this kitten up and set it down on another tile (M). Free."
+	_sel_sell.text = "Sell  +%d%s" % [t.sell_value(), UIKit.hint("  [X]", "")]
 	if t.def.kind != "income":
 		_sel_extra.text = "Bonks: %d    Damage: %d" % [t.kills, int(t.damage_done)]
 
@@ -713,24 +987,56 @@ func _set_tutorial(step: int) -> void:
 	_tutorial_step = step
 	match step:
 		0:
-			_show_hint("Pick a kitten below (or press 1-5), then click a grass tile next to the road.", Control.PRESET_CENTER_BOTTOM, Vector2(0, -160))
+			_show_hint(UIKit.hint("Pick a kitten below (or press 1-5), then click a grass tile next to the road.", "Tap a kitten card, then tap a grass tile twice to build."), Control.PRESET_CENTER_BOTTOM, _bottom_hint_offset)
 		1:
-			_show_hint("Purrfect! Press START WAVE when you're ready. The pack follows the road to my tower!", Control.PRESET_CENTER_TOP, Vector2(0, 160))
+			_show_hint("Purrfect! Press START WAVE when you're ready. The pack follows the road to my tower!", Control.PRESET_CENTER_TOP, _top_hint_offset)
 		2:
-			_show_hint("Click a kitten to upgrade it. Q = Giant Paw, E = Zoomies.\nRight-drag or WASD to look around.", Control.PRESET_CENTER_BOTTOM, Vector2(0, -160))
+			_show_hint(UIKit.hint("Click a kitten to upgrade it, or move it between waves. Q = Giant Paw, E = Zoomies.\nRight-drag or WASD to look around.", "Tap a kitten to upgrade it, or move it between waves. Giant Paw and Zoomies are the big buttons at the bottom left.\nDrag to look around, pinch to zoom."), Control.PRESET_CENTER_BOTTOM, _bottom_hint_offset)
 			get_tree().create_timer(9.0).timeout.connect(func():
 				_hint.visible = false
 				_tutorial_step = 3
 				Save.set_setting("tutorial_done", true))
 
 
-func _show_hint(text: String, preset: Control.LayoutPreset, offset: Vector2) -> void:
+func _show_hint(text: String, preset: Control.LayoutPreset, offset: Callable) -> void:
 	_hint_label.text = text
 	_hint.visible = true
-	_hint.reset_size()
-	_hint.set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, 12)
-	_hint.position += offset
+	_hint_preset = preset
+	_hint_offset = offset
+	_place_hint()
 	UIKit.pop_in(_hint)
+
+
+## Puts the tutorial hint where its offset says now. The bottom hints lift over the card bar
+## and the touch Cancel, and the top one under the wave button, so they are placed again
+## whenever those change size or show.
+func _place_hint() -> void:
+	if not _hint.visible:
+		return
+	_hint.reset_size()
+	_hint.set_anchors_and_offsets_preset(_hint_preset, Control.PRESET_MODE_MINSIZE, 12)
+	_hint_shift_seen = _hint_shift()
+	_hint.position += _hint_offset.call()
+
+
+## Tutorial offset for the bottom hints: clear of the card bar (and the Cancel row, when shown).
+func _bottom_hint_offset() -> Vector2:
+	return Vector2(_hint_shift(), _bottom_lift())
+
+
+## Tutorial offset for the top hint: under the wave button and its preview chips on touch.
+func _top_hint_offset() -> Vector2:
+	if UIKit.is_touch():
+		return Vector2(_hint_shift(), maxf(204.0, _top_box.get_combined_minimum_size().y + 14.0))
+	return Vector2(0, 160.0)
+
+
+## Touch with the selection panel open: the hints move left, centred on the room beside
+## the panel, so a long hint never covers the panel's title and buttons.
+func _hint_shift() -> float:
+	if not (UIKit.is_touch() and _sel_panel.visible):
+		return 0.0
+	return -(_sel_panel.get_combined_minimum_size().x + SEL_MARGIN) * 0.5
 
 
 # ------------------------------------------------------------------ modals
@@ -763,8 +1069,8 @@ func _open_modal(title := "", width := 0.0) -> VBoxContainer:
 
 ## Button for the bottom row of an end-of-run modal, all the same size.
 func _modal_button(text: String, cb: Callable, color: String) -> Button:
-	var b := UIKit.button(text, cb, 22, color)
-	b.custom_minimum_size = Vector2(200, 58)
+	var b := UIKit.button(text, cb, roundi(22 * _text_k()), color)
+	b.custom_minimum_size = Vector2(200 * _text_k(), UIKit.tap_min(58.0, 60.0))
 	return b
 
 
@@ -795,13 +1101,17 @@ func _show_pause_menu() -> void:
 	v.add_child(_center(UIKit.label("Lives lost: %d     Critters bonked: %d" % [game.lives_lost, game.stats_kills], 17, UIKit.INK_SOFT)))
 	for entry in [["Resume", func(): toggle_pause(), "green", "play"],
 			["Settings", func(): _show_settings(), "yellow", "gear"],
+			["Full screen", func(): _toggle_fullscreen(), "yellow", ""],
 			["Restart", func(): game.restart(), "yellow", ""],
 			["Main Menu", func(): game.quit_to_menu(), "red", ""]]:
-		var b := UIKit.button(entry[0], entry[1], 22, entry[2], entry[3])
-		b.custom_minimum_size = Vector2(270, 58)
+		var b := UIKit.button(entry[0], entry[1], roundi(22 * _text_k()), entry[2], entry[3])
+		b.custom_minimum_size = Vector2(270 * _text_k(), UIKit.tap_min(58.0, 60.0))
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(b)
-	var keys := UIKit.label("1-5 build · Q paw · E zoomies · Space wave · F speed\nU upgrade · X sell · T target · right-drag pan · wheel zoom", 14, UIKit.INK_SOFT)
+		if entry[0] == "Full screen":
+			_pause_fs_btn = b
+			b.text = _fs_text(_is_fullscreen())
+	var keys := UIKit.label(UIKit.hint("1-5 build · Q paw · E zoomies · Space wave · F speed\nU upgrade · X sell · T target · right-drag pan · wheel zoom", "Tap a kitten to upgrade it · drag to look around · pinch to zoom"), 14, UIKit.INK_SOFT)
 	v.add_child(_center(keys))
 
 
@@ -822,7 +1132,8 @@ func show_perks(options: Array) -> void:
 	if options.is_empty():
 		return
 	get_tree().paused = true
-	var v := _open_modal("CHOOSE A PURR-K", 760)
+	var sk := _text_k()
+	var v := _open_modal("CHOOSE A PURR-K", maxf(760.0, 3.0 * 220.0 * sk + 80.0))
 	v.add_child(_center(UIKit.label("Your cat found something shiny after wave %d!" % game.wave, 18, UIKit.INK_SOFT)))
 	var row := UIKit.hbox(16)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -832,7 +1143,7 @@ func show_perks(options: Array) -> void:
 	for id in options:
 		var d: Dictionary = GameData.PERKS[id]
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(220, 250)
+		b.custom_minimum_size = Vector2(220, 250) * sk
 		b.add_theme_stylebox_override("normal", UIKit.sbox("sq_grey.png", 20, Vector4(8, 8, 8, 8), Color(1.08, 1.06, 1.0)))
 		b.add_theme_stylebox_override("hover", UIKit.sbox("sq_yellow.png", 20, Vector4(8, 8, 8, 8)))
 		b.add_theme_stylebox_override("pressed", UIKit.sbox("sq_yellow_pressed.png", 20, Vector4(8, 8, 8, 8)))
@@ -845,20 +1156,20 @@ func show_perks(options: Array) -> void:
 		cv.offset_bottom = -20
 		cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(cv)
-		var ic := UIKit.icon(d.icon, Color.WHITE, 76)
+		var ic := UIKit.icon(d.icon, Color.WHITE, 76.0 * sk)
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		cv.add_child(ic)
-		var nm := UIKit.label(d.name, 23, UIKit.INK, 0, true)
+		var nm := UIKit.label(d.name, roundi(23 * sk), UIKit.INK, 0, true)
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(nm)
-		var ds := UIKit.label(d.desc, 16, UIKit.INK_SOFT)
+		var ds := UIKit.label(d.desc, roundi(16 * sk), UIKit.INK_SOFT)
 		ds.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(ds)
 		var stack := game.perk(id)
 		if stack > 0:
-			cv.add_child(_center(UIKit.label("Level %d → %d" % [stack, stack + 1], 15, UIKit.GREEN, 0, true)))
+			cv.add_child(_center(UIKit.label("Level %d → %d" % [stack, stack + 1], roundi(15 * sk), UIKit.GREEN, 0, true)))
 		b.pressed.connect(func():
 			_close_modal()
 			get_tree().paused = false
@@ -872,6 +1183,7 @@ func show_perks(options: Array) -> void:
 		var rr := UIKit.button("Reroll (%d left)" % game.rerolls, func():
 			game.rerolls -= 1
 			show_perks(game.roll_perks()), 18, "blue")
+		rr.custom_minimum_size.y = UIKit.tap_min(0.0, 60.0)
 		rr.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(rr)
 

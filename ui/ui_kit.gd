@@ -33,6 +33,21 @@ static var _body: FontVariation
 static var _body_bold: FontVariation
 static var _tex := {}
 
+## Touch layout. Phones and tablets get bigger tap targets and wording without
+## keyboard keys. The device is probed once; the HUD also sets `touch_seen` on the
+## first screen touch, for touch screens the probe missed.
+##
+## Sizes are in logical px, but the stretch (canvas_items + expand, 720 logical px
+## high) means one logical px can be much less than one real screen px: on a 390 px
+## tall phone it is 0.54 real px. So the touch scale follows the real window size.
+const TOUCH_SCALE_MIN := 1.25 # what a 1280x720 touch screen gets (one logical px = one real px)
+const TOUCH_SCALE_MAX := 1.7 # cap for very small windows
+const TOUCH_BASE := 56.0 # a base tap target, in logical px
+const TOUCH_MIN_PX := 46.0 # the real screen px a tap target should cover (44 is the floor)
+static var touch_seen := false
+static var _probed := false
+static var _probe_touch := false
+
 
 static func body_font(bold := false) -> Font:
 	if _body == null:
@@ -361,3 +376,198 @@ static func _fit_ribbon(p: PanelContainer) -> void:
 	l.label_settings.font_size = fs
 	var text_w := DISPLAY.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	p.custom_minimum_size.x = maxf(width, text_w + pad)
+
+
+# ------------------------------------------------------------------ touch
+
+## True on touch devices, or once a screen touch has been seen. Cached.
+static func is_touch() -> bool:
+	if touch_seen:
+		return true
+	if not _probed:
+		_probed = true
+		_probe_touch = _device_has_touch()
+	return _probe_touch
+
+
+## Window size in real screen px. On the web it is the canvas's CSS size, so a
+## high-density phone (devicePixelRatio 2 or 3) is not counted as bigger than it is.
+static func window_px() -> Vector2:
+	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
+		var js = Engine.get_singleton("JavaScriptBridge")
+		var s := str(js.eval("(function(){var c=document.getElementById('canvas');return c?c.clientWidth+','+c.clientHeight:''})()", true))
+		var parts := s.split(",")
+		if parts.size() == 2 and parts[0].to_float() > 0.0 and parts[1].to_float() > 0.0:
+			return Vector2(parts[0].to_float(), parts[1].to_float())
+	return Vector2(DisplayServer.window_get_size())
+
+
+## Real screen px per logical px, as the stretch currently draws them. The logical
+## size is the root viewport's visible rect; with `expand` the smaller of the two
+## ratios is the drawn scale (in a landscape window that is the height ratio).
+## Returns 1.0 when there is no window yet.
+static func px_per_logical() -> float:
+	var main := Engine.get_main_loop() as SceneTree
+	if main == null or main.root == null:
+		return 1.0
+	var logical := main.root.get_visible_rect().size
+	var px := window_px()
+	if logical.x <= 0.0 or logical.y <= 0.0 or px.x <= 0.0 or px.y <= 0.0:
+		return 1.0
+	return minf(px.x / logical.x, px.y / logical.y)
+
+
+## Layout multiplier for touch: 1.0 on desktop. On touch it makes a TOUCH_BASE
+## logical target cover TOUCH_MIN_PX real px, clamped to [TOUCH_SCALE_MIN, TOUCH_SCALE_MAX].
+## A 1280x720 touch screen gets TOUCH_SCALE_MIN, as before.
+static func touch_scale() -> float:
+	if not is_touch():
+		return 1.0
+	return clampf(TOUCH_MIN_PX / (TOUCH_BASE * px_per_logical()), TOUCH_SCALE_MIN, TOUCH_SCALE_MAX)
+
+
+## The touch wording on touch screens, the desktop wording otherwise.
+static func hint(desktop: String, touch: String) -> String:
+	return touch if is_touch() else desktop
+
+
+## `desktop` as it is, but on touch screens at least `touch_min` logical px and never
+## less than TOUCH_MIN_PX real px (so it is the same on every screen, not only 720 high).
+static func tap_min(desktop: float, touch_min: float) -> float:
+	if not is_touch():
+		return desktop
+	return maxf(desktop, maxf(touch_min, TOUCH_MIN_PX / px_per_logical()))
+
+
+static func _device_has_touch() -> bool:
+	if DisplayServer.is_touchscreen_available():
+		return true
+	if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
+		var js = Engine.get_singleton("JavaScriptBridge")
+		var ok = js.eval("('ontouchstart' in window) || navigator.maxTouchPoints > 0", true)
+		return ok is bool and ok
+	return false
+
+
+## Thicker track and a bigger paw grabber on touch. Desktop sliders are left alone.
+static func touch_slider(s: HSlider) -> void:
+	if not is_touch():
+		return
+	s.custom_minimum_size.y = 48.0
+	var groove := StyleBoxFlat.new()
+	groove.bg_color = Color("c9a77c")
+	groove.set_corner_radius_all(9)
+	groove.content_margin_top = 9
+	groove.content_margin_bottom = 9
+	var fill := groove.duplicate() as StyleBoxFlat
+	fill.bg_color = Color("e8913a")
+	s.add_theme_stylebox_override("slider", groove)
+	s.add_theme_stylebox_override("grabber_area", fill)
+	s.add_theme_stylebox_override("grabber_area_highlight", fill)
+	var grab := _scaled_icon("paw", 42)
+	s.add_theme_icon_override("grabber", grab)
+	s.add_theme_icon_override("grabber_highlight", grab)
+
+
+## Four corner brackets for a full-screen button, drawn so no glyph font is needed.
+## `exit` is asked on each draw: the brackets point inwards while full screen.
+static func fullscreen_glyph(exit: Callable) -> Control:
+	var c := Control.new()
+	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.draw.connect(func():
+		var s := c.size
+		var a := s * 0.26
+		var b := s - a
+		var arm := s.x * 0.2
+		var ex: bool = exit.call()
+		# [corner, inward x, inward y] for the four corners of the frame
+		for corner in [[a, 1.0, 1.0], [Vector2(b.x, a.y), -1.0, 1.0], [Vector2(a.x, b.y), 1.0, -1.0], [b, -1.0, -1.0]]:
+			var p: Vector2 = corner[0]
+			var sx: float = corner[1]
+			var sy: float = corner[2]
+			# windowed: the bracket sits on the frame; full screen: it steps inwards, arms pointing out
+			var tip := p + Vector2(sx * arm, sy * arm) if ex else p
+			var dir := -1.0 if ex else 1.0
+			c.draw_line(tip, tip + Vector2(dir * sx * arm, 0), INK, 3.0, true)
+			c.draw_line(tip, tip + Vector2(0, dir * sy * arm), INK, 3.0, true))
+	return c
+
+
+## A full-screen "turn your phone" card for portrait viewports. It sits on a top
+## layer above the HUD, the modals and the menus, blocks input while shown, and is
+## re-checked on every viewport resize. It never pauses the game.
+static func make_rotate_overlay(parent: Node) -> Control:
+	var top := CanvasLayer.new()
+	top.layer = 120
+	top.process_mode = Node.PROCESS_MODE_ALWAYS
+	parent.add_child(top)
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.process_mode = Node.PROCESS_MODE_ALWAYS
+	top.add_child(root)
+	var shade := ColorRect.new()
+	shade.color = Color(OUTLINE, 0.94)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(shade)
+	var box := vbox(12)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(box)
+	# Sized for portrait: the stretch keeps the 1280-wide base, so the whole phone screen
+	# is 1280 logical px across, roughly three times the landscape scale.
+	var phone := _phone_glyph(2.8)
+	box.add_child(phone)
+	var rb := ribbon("Rotate your phone", 84, 1000)
+	rb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(rb)
+	var tip := label("Tower Tiles plays best in landscape", 52, CREAM, 14, true)
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tip.custom_minimum_size.x = 900
+	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(tip)
+
+	var tw := phone.create_tween().set_loops().set_ignore_time_scale(true)
+	tw.tween_interval(0.5)
+	tw.tween_property(phone, "rotation", -PI * 0.5, 0.8).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_interval(1.4)
+	tw.tween_property(phone, "rotation", 0.0, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+
+	var vp := parent.get_viewport()
+	var refresh: Callable = func():
+		if is_instance_valid(root):
+			var s := root.get_viewport_rect().size
+			root.visible = s.y > s.x * 1.05
+	if vp:
+		vp.size_changed.connect(refresh)
+		root.tree_exiting.connect(func():
+			if vp.size_changed.is_connected(refresh):
+				vp.size_changed.disconnect(refresh))
+	refresh.call()
+	return root
+
+
+## A phone outline with a grass screen, for the rotate overlay, drawn at `k` times
+## the 80x136 size. Turns about its centre.
+static func _phone_glyph(k: float) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(150, 150) * k
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.process_mode = Node.PROCESS_MODE_ALWAYS
+	c.resized.connect(func(): c.pivot_offset = c.size * 0.5)
+	var body := StyleBoxFlat.new()
+	body.bg_color = Color("6b4426")
+	body.border_color = CREAM
+	body.set_border_width_all(int(6 * k))
+	body.set_corner_radius_all(int(16 * k))
+	c.draw.connect(func():
+		var mid := c.size * 0.5
+		var r := Rect2(mid - Vector2(40, 68) * k, Vector2(80, 136) * k)
+		c.draw_style_box(body, r)
+		c.draw_rect(Rect2(r.position + Vector2(8, 14) * k, r.size - Vector2(16, 30) * k), Color("8fd16a"))
+		c.draw_circle(Vector2(mid.x, r.end.y - 9 * k), 4.0 * k, CREAM))
+	return c

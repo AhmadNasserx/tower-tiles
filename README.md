@@ -16,14 +16,17 @@ Your cat lives at the top of a tower. The neighborhood pack wants in. Build a sq
 | Action | Mouse / touch | Keys |
 | --- | --- | --- |
 | Pick a kitten to build | Click a card in the bottom bar | `1`–`5` |
-| Place it | Click a grass tile (tap twice on touch) | Hold `Shift` to keep placing |
-| Select / upgrade / sell | Click a kitten | `U` upgrade · `X` sell · `T` target mode |
+| Place it | Click a grass tile (tap the same tile twice on touch). You keep placing until your gold runs out | `Esc` / right-click to stop |
+| Select / upgrade / move / sell | Click a kitten | `U` upgrade · `M` move (between waves only) · `X` sell · `T` target mode |
 | Start the next wave early (bonus gold) | **Start Wave** button | `Space` |
 | Giant Paw Slam | Paw button, then click the road | `Q` |
 | Zoomies (2× attack speed) | Lightning button | `E` |
 | Game speed 1×/2×/3× | Speed button | `F` |
-| Pan / zoom | Right-drag · mouse wheel · pinch | `WASD` / arrows |
+| Pan / zoom | Drag to pan · wheel zooms toward the cursor · one-finger drag, pinch and two-finger drag on touch | `WASD` / arrows · `+` / `-` zoom · `R` reset view |
 | Pause | Pause button | `Esc` |
+
+### Playing on a phone
+The web build is made for touch. Drag with one finger to pan, pinch to zoom, tap a kitten card and then tap a grass tile twice to build. A **Cancel** button appears while you are placing or moving a kitten, buttons grow to a comfortable tap size on small screens, and a full screen button sits in the top corner. Landscape works best (the game asks you to rotate if you hold it upright).
 
 ### Kittens
 | Kitten | Role |

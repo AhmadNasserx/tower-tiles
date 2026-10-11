@@ -59,6 +59,14 @@ func _ready() -> void:
 	_build_fish_counter()
 	_build_footer()
 	Save.fish_changed.connect(func(f): _set_fish(f, true))
+	UIKit.make_rotate_overlay(self)
+
+
+## The first screen touch on a device the probe missed turns the touch layout on.
+## Panels are built when opened, so they pick it up from then on.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed and not UIKit.is_touch():
+		UIKit.touch_seen = true
 
 
 func _build_title() -> void:
@@ -195,7 +203,7 @@ func _show_maps() -> void:
 		row.add_child(_map_card(i))
 	row.add_child(_wild_card())
 	var back := UIKit.button("Back", _close_panel, 20, "yellow")
-	back.custom_minimum_size.x = 160
+	back.custom_minimum_size = Vector2(160, UIKit.tap_min(0.0, 60.0))
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(back)
 
@@ -360,8 +368,11 @@ func _show_shop() -> void:
 		_shop_fox.say_refund()
 		_refresh_shop(), 18, "red")
 	refund.tooltip_text = "Get every fish back and re-spec."
+	refund.custom_minimum_size.y = UIKit.tap_min(0.0, 60.0)
 	row.add_child(refund)
-	row.add_child(UIKit.button("Back", _close_panel, 20, "yellow"))
+	var back := UIKit.button("Back", _close_panel, 20, "yellow")
+	back.custom_minimum_size.y = UIKit.tap_min(0.0, 60.0)
+	row.add_child(back)
 	right.add_child(row)
 
 	_refresh_shop("", true)
@@ -484,7 +495,7 @@ func _meta_card(id: String) -> Control:
 	# a disabled button lets clicks fall through to the card, so Fenn can still react
 	if b.disabled:
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.custom_minimum_size.x = 96
+	b.custom_minimum_size = Vector2(96, UIKit.tap_min(0.0, 56.0))
 	bottom.add_child(b)
 
 	p.mouse_entered.connect(_card_hovered.bind(id))

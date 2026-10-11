@@ -63,6 +63,17 @@ func setup(p_game: Game, p_type: String, p_cell: Vector2i) -> void:
 	_build()
 
 
+## Moves this kitten to another tile. The game owns the `turrets` dictionary and the
+## visuals; this resets the state that depends on where the kitten stands.
+func relocate(new_cell: Vector2i, new_pos: Vector3) -> void:
+	cell = new_cell
+	position = new_pos
+	_target = null
+	_retarget_t = 0.0
+	_beam_acc.clear()
+	_set_beams_visible(false)
+
+
 func lvl() -> Dictionary:
 	return def.levels[level]
 

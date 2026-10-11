@@ -17,6 +17,10 @@ static var custom_map := {}
 
 const SPEEDS := [1.0, 2.0, 3.0]
 const COUNTDOWN := 12.0
+## A left press that moves further than this (mouse only) is a camera drag, not a click.
+const DRAG_PX := 10.0
+## How high a kitten is lifted while it is being moved.
+const MOVE_LIFT := 1.4
 
 var map: Dictionary
 var level: Level
@@ -57,11 +61,17 @@ var paw_cd := 0.0
 var zoomies_cd := 0.0
 var zoomies_time := 0.0
 
-var mode := "" # "", "build", "paw"
+var mode := "" # "", "build", "paw", "move"
 var build_type := ""
 var selected: Turret
+var move_turret: Turret # the kitten being picked up while mode == "move"
 var hover_cell := Vector2i(-99, -99)
 var _touch_armed := Vector2i(-99, -99)
+# left press state: clicks act on release, so a drag never places, selects or moves
+var _press_active := false
+var _press_pos := Vector2.ZERO
+var _press_touch := false
+var _lift_tw: Tween
 
 var stats_damage := 0.0
 var stats_kills := 0
@@ -348,6 +358,9 @@ func shake(amount: float) -> void:
 func start_wave() -> void:
 	if in_wave or not playing:
 		return
+	# kittens can only be moved between waves: put a half-done move back
+	if mode == "move":
+		_cancel_move()
 	if countdown > 0.0 and wave > 0:
 		var bonus := int(countdown * 1.5)
 		if bonus > 0:
@@ -666,21 +679,37 @@ func spawn_projectile(source: Node, from: Vector3, target: Enemy, dmg: float, cr
 # ------------------------------------------------------------------ building
 func set_build_type(type: String) -> void:
 	if type == "" or type == build_type:
-		build_type = ""
-		mode = ""
+		_exit_build()
 	else:
 		if gold < price(GameData.TURRETS[type].cost):
 			if hud:
 				hud.toast("Not enough gold!", GameData.C_RED)
 			Sfx.play("error")
 			return
+		if mode == "move":
+			_cancel_move()
+		if mode == "paw":
+			_paw_marker.visible = false
+		select(null)
 		build_type = type
 		mode = "build"
-		select(null)
+		_touch_armed = Vector2i(-99, -99)
 		_set_ghost(type)
-	_touch_armed = Vector2i(-99, -99)
-	build_mode_changed.emit(build_type)
+		build_mode_changed.emit(build_type)
 	Sfx.play("click")
+
+
+## Leaves build mode. A toast explains why when the player ran out of gold.
+func _exit_build(toast_text := "") -> void:
+	if mode == "build":
+		mode = ""
+	build_type = ""
+	_touch_armed = Vector2i(-99, -99)
+	_ghost.visible = false
+	_range_disc.visible = false
+	build_mode_changed.emit("")
+	if toast_text != "" and hud:
+		hud.toast(toast_text, GameData.C_RED)
 
 
 ## A see-through preview of the kitten's tower under the cursor.
@@ -738,6 +767,8 @@ func upgrade_selected() -> void:
 		if hud:
 			hud.toast("Not enough gold!", GameData.C_RED)
 		return
+	if mode == "move":
+		_cancel_move(false) # the upgrade's own pop tween owns the scale now
 	selected.invested += cost
 	selected.upgrade()
 	fx.sparkle(selected.global_position + Vector3(0, 1.4, 0), GameData.C_GOLD)
@@ -751,6 +782,8 @@ func upgrade_selected() -> void:
 func sell_selected() -> void:
 	if selected == null:
 		return
+	if mode == "move":
+		_cancel_move(false)
 	var t := selected
 	var value := t.sell_value()
 	select(null)
@@ -772,11 +805,15 @@ func cycle_target_mode() -> void:
 
 
 func select(t: Turret) -> void:
+	# selecting anything but the kitten being moved cancels the move
+	if mode == "move" and t != move_turret:
+		_cancel_move()
 	selected = t
 	if t:
-		mode = ""
-		build_type = ""
-		build_mode_changed.emit("")
+		if mode != "move":
+			mode = ""
+			build_type = ""
+			build_mode_changed.emit("")
 		if t.def.kind != "income":
 			_show_range(t.global_position, t.get_range(), Color(1, 1, 1))
 		else:
@@ -797,6 +834,121 @@ func _show_range(pos: Vector3, r: float, col: Color) -> void:
 	if not _range_disc.scale.is_equal_approx(target):
 		var tw := _range_disc.create_tween()
 		tw.tween_property(_range_disc, "scale", target, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+# ------------------------------------------------------------------ moving (between waves)
+## Picks up the selected kitten: it lifts and shrinks, and a ghost follows the cursor
+## over empty buildable tiles. Free. Pressing M again, Esc or right-click puts it back.
+func begin_move() -> void:
+	if mode == "move":
+		_cancel_move()
+		return
+	if in_wave:
+		if hud:
+			hud.toast("Kittens can only be moved between waves", GameData.C_RED)
+		Sfx.play("error")
+		return
+	if not playing or selected == null or not is_instance_valid(selected):
+		return
+	mode = "move"
+	build_type = ""
+	move_turret = selected
+	_touch_armed = Vector2i(-99, -99)
+	_range_disc.visible = false
+	_set_ghost(move_turret.type)
+	_lift(move_turret, true)
+	build_mode_changed.emit("move")
+	Sfx.play("click")
+
+
+## Ends the move and sets the kitten back on its own tile. The selection is kept.
+func _cancel_move(animate := true) -> void:
+	var t := move_turret
+	_clear_move()
+	if is_instance_valid(t):
+		_lift(t, false, not animate)
+	build_mode_changed.emit("")
+	_show_selected_range()
+
+
+func _clear_move() -> void:
+	if mode == "move":
+		mode = ""
+	move_turret = null
+	_touch_armed = Vector2i(-99, -99)
+	_ghost.visible = false
+	_range_disc.visible = false
+	if _lift_tw and _lift_tw.is_valid():
+		_lift_tw.kill()
+
+
+## Raises a kitten for a move (up) or sets it back down on its tile. `instant` snaps
+## it without a tween, for when another tween is about to take over its scale.
+func _lift(t: Turret, up: bool, instant := false) -> void:
+	if _lift_tw and _lift_tw.is_valid():
+		_lift_tw.kill()
+	var home := level.cell_to_world(t.cell)
+	var pos := (home + Vector3(0, MOVE_LIFT, 0)) if up else home
+	var sc := Vector3.ONE * (0.8 if up else 1.0)
+	if instant:
+		t.position = pos
+		t.scale = sc
+		return
+	_lift_tw = t.create_tween().set_parallel()
+	_lift_tw.tween_property(t, "position", pos, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_lift_tw.tween_property(t, "scale", sc, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _show_selected_range() -> void:
+	if selected and is_instance_valid(selected) and selected.def.kind != "income":
+		_show_range(selected.global_position, selected.get_range(), Color(1, 1, 1))
+	else:
+		_range_disc.visible = false
+
+
+## Clicks while moving: the kitten's own tile puts it back, another kitten's tile
+## selects that one, and a free buildable tile sets it down.
+func _click_move(c: Vector2i, from_touch: bool) -> void:
+	if c == move_turret.cell:
+		_cancel_move()
+		return
+	if turrets.has(c):
+		select(turrets[c])
+		return
+	if not can_build(c):
+		Sfx.play("error")
+		return
+	if from_touch and _touch_armed != c:
+		# on touch screens, first tap previews, second tap sets it down
+		_touch_armed = c
+		hover_cell = c
+		Sfx.play("hover")
+		return
+	_relocate(c)
+
+
+## Sets the picked-up kitten down on `c`. Free; it keeps its level, targeting and
+## invested value. It hops onto the new tile and stays selected.
+func _relocate(c: Vector2i) -> void:
+	var t := move_turret
+	var wp := level.cell_to_world(c)
+	turrets.erase(t.cell)
+	turrets[c] = t
+	t.relocate(c, wp)
+	_clear_move()
+	build_mode_changed.emit("")
+	t.position = wp + Vector3(0, MOVE_LIFT, 0)
+	t.scale = Vector3.ONE * 0.8
+	_lift_tw = t.create_tween().set_parallel()
+	_lift_tw.tween_property(t, "position", wp, 0.35).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	_lift_tw.tween_property(t, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.cat.hop(3.0)
+	fx.dust(wp, 0.8)
+	fx.sparkle(wp + Vector3(0, 1.0, 0), t.def.accent)
+	Sfx.play("build", 1.1, 0.05)
+	shake(0.05)
+	_show_selected_range()
+	selection_changed.emit(t)
 
 
 # ------------------------------------------------------------------ abilities
@@ -1035,7 +1187,7 @@ func _update_hover() -> void:
 		_hover_tile.visible = false
 		_ghost.visible = false
 		_paw_marker.visible = false
-		if mode == "build" and selected == null:
+		if mode == "build" or mode == "move":
 			_range_disc.visible = false
 		return
 	var c := level.world_to_cell(gp)
@@ -1052,20 +1204,27 @@ func _update_hover() -> void:
 	if not level.in_bounds(c):
 		_hover_tile.visible = false
 		_ghost.visible = false
+		if mode == "build" or mode == "move":
+			_range_disc.visible = false
 		return
 	var wp := level.cell_to_world(c)
 	_hover_tile.visible = true
 	_hover_tile.global_position = wp + Vector3(0, 0.03, 0)
 	var pulse := 0.75 + sin(Time.get_ticks_msec() * 0.008) * 0.2
 	var col := Color(1, 1, 1, pulse * 0.6)
-	if mode == "build":
-		var ok := can_build(c)
+	if mode == "build" or mode == "move":
+		# the kitten's own tile is not a valid place to put it back, but it is not an error either
+		var own := mode == "move" and c == move_turret.cell
+		var ok := not own and can_build(c)
 		col = Color(GameData.C_GREEN, pulse) if ok else Color(GameData.C_RED, pulse)
+		if own:
+			col = Color(1, 1, 1, pulse * 0.6)
 		_ghost.visible = ok
 		_ghost.global_position = wp
-		var r: float = GameData.TURRETS[build_type].levels[0].range * range_mult
+		var r := _placing_range()
 		if r > 0.0:
-			_show_range(wp, r, GameData.C_GREEN if ok else GameData.C_RED)
+			var ring := Color.WHITE if own else (GameData.C_GREEN if ok else GameData.C_RED)
+			_show_range(wp, r, ring)
 		else:
 			_range_disc.visible = false
 	else:
@@ -1077,14 +1236,38 @@ func _update_hover() -> void:
 	_hover_tile.scale = Vector3(bob, 1.0, bob) * Level.KIT
 
 
+## Range of the thing being placed: a new kitten's first level, or the moved kitten's own range.
+func _placing_range() -> float:
+	if mode == "move":
+		return move_turret.get_range()
+	return float(GameData.TURRETS[build_type].levels[0].range) * range_mult
+
+
+## True when a left press that ended at `release_pos` was a click, not a camera drag.
+## The camera flags drags (`drag_moved`); a mouse that moved DRAG_PX or more is a drag too.
+func _is_click(release_pos: Vector2) -> bool:
+	if camera.get("drag_moved") == true:
+		return false
+	if not _press_touch and _press_pos.distance_to(release_pos) >= DRAG_PX:
+		return false
+	return hud == null or not hud.is_mouse_over_ui()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if demo or not playing:
 		return
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
-			_on_left_click(mb.position, mb.shift_pressed, mb.device == InputEvent.DEVICE_ID_EMULATION)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			if mb.pressed:
+				_press_active = true
+				_press_pos = mb.position
+				_press_touch = mb.device == InputEvent.DEVICE_ID_EMULATION
+			elif _press_active:
+				_press_active = false
+				if _is_click(mb.position):
+					_on_left_click(_press_pos, _press_touch)
+		elif mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 			_cancel()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var k := (event as InputEventKey).keycode
@@ -1106,6 +1289,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				sell_selected()
 			KEY_T:
 				cycle_target_mode()
+			KEY_M:
+				begin_move()
 			KEY_ESCAPE, KEY_P:
 				if mode != "" or selected:
 					_cancel()
@@ -1113,16 +1298,23 @@ func _unhandled_input(event: InputEvent) -> void:
 					hud.toggle_pause()
 
 
+## Esc / right-click: leaves whatever mode is active. While moving, it only puts the
+## kitten back, so the selection survives; a second press deselects.
 func _cancel() -> void:
+	if mode == "move":
+		_cancel_move()
+		return
 	if mode == "paw":
 		_paw_marker.visible = false
 	mode = ""
 	build_type = ""
+	_touch_armed = Vector2i(-99, -99)
+	_ghost.visible = false
 	build_mode_changed.emit("")
 	select(null)
 
 
-func _on_left_click(pos: Vector2, shift: bool, from_touch := false) -> void:
+func _on_left_click(pos: Vector2, from_touch := false) -> void:
 	var gp = camera.ground_point(pos)
 	if gp == null:
 		return
@@ -1131,31 +1323,35 @@ func _on_left_click(pos: Vector2, shift: bool, from_touch := false) -> void:
 		return
 	var c := level.world_to_cell(gp)
 	if mode == "build":
-		if not can_build(c):
-			Sfx.play("error")
-			if turrets.has(c):
-				select(turrets[c])
-			return
-		if from_touch and _touch_armed != c:
-			# on touch screens, first tap previews, second tap builds
-			_touch_armed = c
-			hover_cell = c
-			Sfx.play("hover")
-			return
-		var type := build_type
-		build(type, c)
-		_touch_armed = Vector2i(-99, -99)
-		if not (shift and gold >= price(GameData.TURRETS[type].cost)):
-			mode = ""
-			build_type = ""
-			_ghost.visible = false
-			_range_disc.visible = false
-			build_mode_changed.emit("")
+		_click_build(c, from_touch)
+		return
+	if mode == "move":
+		_click_move(c, from_touch)
 		return
 	if turrets.has(c):
 		select(turrets[c])
 	else:
 		select(null)
+
+
+func _click_build(c: Vector2i, from_touch: bool) -> void:
+	if not can_build(c):
+		Sfx.play("error")
+		if turrets.has(c):
+			select(turrets[c])
+		return
+	if from_touch and _touch_armed != c:
+		# on touch screens, first tap previews, second tap builds
+		_touch_armed = c
+		hover_cell = c
+		Sfx.play("hover")
+		return
+	var cost := price(GameData.TURRETS[build_type].cost)
+	build(build_type, c)
+	_touch_armed = Vector2i(-99, -99)
+	# stay in build mode for the same kitten while it is still affordable
+	if gold < cost:
+		_exit_build("Out of gold")
 
 
 # ------------------------------------------------------------------ demo (menu background)

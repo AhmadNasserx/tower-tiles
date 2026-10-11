@@ -211,13 +211,26 @@ const RING_BOTTOM := 11
 const BAND_COUNT := 5
 const BAND_DITHER := 0.35 # share of band 1-4 tiles that take the next band's tint
 const BOARD_TINT := Color(0.965, 0.985, 0.95) # the board's average: white and 0.93/0.97/0.9 checks
-const MEADOW_DEEP := Color(0.9, 0.95, 0.8) # where the meadow drifts to: deeper, warmer green
+const MEADOW_DEEP := Color(0.84, 0.92, 0.74) # where the meadow drifts to: deeper, shadowed green
 const BAND_HUE := [Color(1, 1, 1), Color(1.01, 1.0, 0.98), Color(0.99, 1.01, 0.99), Color(1.0, 0.99, 0.96), Color(0.98, 1.0, 0.97)]
 const GRASS_AVG := Color8(112, 178, 100) # matched by eye to how the lit tile tops render, so the flat ground blends into the tile ring
 const GROUND_Y := -0.4 # below the recessed road tiles so they stay visible; outside the tile ring it is far from the camera
 const GROUND_SIZE := 500.0
 const SCATTER_PAD := 3.0 # clear strip (1.5 cells) between the board and any scatter
+const TREE_PAD := 5.0 # trees keep a clearing of 2.5 cells (5 units) around the board
 const SURROUND_SEED := 7919
+const FOREST_SHARE := 0.4 # share of cluster centres that are forest clumps (the rest are bush/flower meadow)
+const FOREST_BEYOND := 6.0 # scatter reaches this far past the outer ring: the treeline
+const FOREST_RAMP := 9.0 # density climbs from the board edge (WEIGHT_EDGE) to full (1.0) over this distance
+const WEIGHT_EDGE := 0.15 # acceptance chance right at the keepout
+const RIM_NEAR := 5.0 # framing forest clumps on the left, right and top sit this far out from the board...
+const RIM_FAR := 14.0 # ...up to this far, drawn mostly from the near end so they land in the default camera view
+const RIM_SIDE := [8, 10] # clumps per side (left and right each), spread evenly along the side
+const RIM_TOP := [5, 7] # clumps across the top
+const TREELINE_NEAR := 5.5 # the ring of single trees runs along a curve this far out...
+const TREELINE_FAR := 8.5 # ...to this far out, wobbling in between (the default view shows only ~6 units past the board)
+const NEAR_TREE := 8.0 # trees within this of the board are mostly small; the large kit trees take over further out
+const FAR_TREE := 16.0 # trees beyond this distance from the board skip the outline pass
 const BUSH_COLS := [Color("5a9a48"), Color("4f8f42"), Color("6aa653")]
 const FLOWER_COLS := [Color("f08ab4"), Color("f7f3ea"), Color("f6d34a")] # pink, white, yellow
 
@@ -263,40 +276,38 @@ func _build_meadow() -> void:
 func _build_scatter(half: Vector2) -> void:
 	var bushes := [[], [], []]
 	var flowers := [[], [], []]
-	# clusters of trees/rocks or of bushes/flower patches, denser further out
-	var want := _srng.randi_range(18, 24)
+	_build_rim(half, bushes, flowers)
+	_build_treeline(half)
+	# cluster centres, drawn denser further out: forest clumps or bush/flower meadows
+	var want := _srng.randi_range(34, 40)
 	var centres: Array[Vector3] = []
-	for i in 4000:
+	for i in 8000:
 		if centres.size() >= want:
 			break
 		var p := _meadow_point(half)
 		if _clear_of_board(p, half, SCATTER_PAD) and _srng.randf() < _meadow_weight(p, half):
 			centres.append(p)
 	for c in centres:
-		var forest := _srng.randf() < 0.5
-		var n := _srng.randi_range(6, 20)
-		var spread := 1.2 + 0.4 * sqrt(float(n))
-		for i in n:
-			var p := c + Vector3(_srng.randfn(0.0, spread), 0.0, _srng.randfn(0.0, spread))
-			var r := _srng.randf()
-			var kind: String
-			if forest:
-				kind = "tree" if r < 0.6 else ("rock" if r < 0.8 else "bush")
-			else:
-				kind = "bush" if r < 0.4 else "flower"
-			_place(kind, p, half, bushes, flowers)
-	# sparse singles
-	for i in 110:
+		if _srng.randf() < FOREST_SHARE:
+			_forest_clump(c, half, bushes, flowers)
+		else:
+			var n := _srng.randi_range(6, 14)
+			var spread := 1.2 + 0.4 * sqrt(float(n))
+			for i in n:
+				var p := c + Vector3(_srng.randfn(0.0, spread), 0.0, _srng.randfn(0.0, spread))
+				_place("bush" if _srng.randf() < 0.4 else "flower", p, half, bushes, flowers)
+	# a thin sprinkling of single trees and shrubs so the edge does not read as a pattern
+	for i in 130:
 		var p := _meadow_point(half)
 		if _srng.randf() > _meadow_weight(p, half):
 			continue
 		var r := _srng.randf()
 		var kind: String
-		if r < 0.3:
+		if r < 0.25:
 			kind = "tree"
-		elif r < 0.45:
+		elif r < 0.35:
 			kind = "rock"
-		elif r < 0.75:
+		elif r < 0.7:
 			kind = "bush"
 		else:
 			kind = "flower"
@@ -320,18 +331,90 @@ func _build_scatter(half: Vector2) -> void:
 			_multimesh(dot, flowers[k], Toon.material_for(null, FLOWER_COLS[k]), false)
 
 
-## A uniform point in the scatter area: inside the outer tile ring, a unit short of its edge.
+## A uniform point in the scatter area: inside the outer tile ring, a unit short of its
+## edge, and up to FOREST_BEYOND past it so the outer forest reads as a treeline.
 func _meadow_point(half: Vector2) -> Vector3:
-	var x := _srng.randf_range(-half.x - (RING_LEFT * GameData.TILE - 1.0), half.x + (RING_RIGHT * GameData.TILE - 1.0))
-	var z := _srng.randf_range(-half.y - (RING_TOP * GameData.TILE - 1.0), half.y + (RING_BOTTOM * GameData.TILE - 1.0))
+	var x := _srng.randf_range(-half.x - (RING_LEFT * GameData.TILE - 1.0 + FOREST_BEYOND), half.x + (RING_RIGHT * GameData.TILE - 1.0 + FOREST_BEYOND))
+	var z := _srng.randf_range(-half.y - (RING_TOP * GameData.TILE - 1.0 + FOREST_BEYOND), half.y + (RING_BOTTOM * GameData.TILE - 1.0 + FOREST_BEYOND))
 	return Vector3(x, 0.0, z)
 
 
-## Acceptance chance for scatter: 0.3 at the board edge, rising to 1 about 18 units out.
-func _meadow_weight(p: Vector3, half: Vector2) -> float:
+## Distance from a point to the board rectangle (0 on or inside it).
+func _edge_dist(p: Vector3, half: Vector2) -> float:
 	var dx := maxf(0.0, absf(p.x) - half.x)
 	var dz := maxf(0.0, absf(p.z) - half.y)
-	return clampf(0.3 + sqrt(dx * dx + dz * dz) / 18.0, 0.3, 1.0)
+	return sqrt(dx * dx + dz * dz)
+
+
+## Acceptance chance for scatter: WEIGHT_EDGE at the keepout, easing up (smoothstep) to 1
+## FOREST_RAMP units out, so the cover is open around the board and dense just beyond it.
+func _meadow_weight(p: Vector3, half: Vector2) -> float:
+	var t := clampf(_edge_dist(p, half) / FOREST_RAMP, 0.0, 1.0)
+	return lerpf(WEIGHT_EDGE, 1.0, t * t * (3.0 - 2.0 * t))
+
+
+## The framing edge: forest clumps on the left and right sides (RIM_NEAR-RIM_FAR out, stratified
+## along the side so there is no bare stretch in view) and a row of closer clumps across the top
+## (the default view shows only ~6 units past it). The south side gets none; the sides stop short
+## of the south corner so the forest thins toward the bottom and the strip below the board stays open.
+func _build_rim(half: Vector2, bushes: Array, flowers: Array) -> void:
+	var sides := _srng.randi_range(RIM_SIDE[0], RIM_SIDE[1])
+	for k in sides:
+		var z := lerpf(-half.y - 8.0, half.y - 2.0, (k + _srng.randf()) / sides)
+		for sx in [-1.0, 1.0]:
+			var d := RIM_NEAR + (RIM_FAR - RIM_NEAR) * _srng.randf() * _srng.randf()
+			_forest_clump(Vector3(sx * (half.x + d), 0.0, z + _srng.randf_range(-1.5, 1.5)), half, bushes, flowers)
+	var tops := _srng.randi_range(RIM_TOP[0], RIM_TOP[1])
+	for k in tops:
+		var x := lerpf(-half.x - 8.0, half.x + 8.0, (k + _srng.randf()) / tops)
+		_forest_clump(Vector3(x, 0.0, -half.y - RIM_NEAR - 2.5 * _srng.randf()), half, bushes, flowers)
+
+
+## A forest clump: 12-40 trees in a tight gaussian core with a looser rim, a few rock piles,
+## and bushes around the fringe. Each tree is also thinned by the distance weight.
+func _forest_clump(c: Vector3, half: Vector2, bushes: Array, flowers: Array) -> void:
+	var trees := _srng.randi_range(12, 40)
+	var spread := 1.2 + 0.36 * sqrt(float(trees))
+	for i in trees:
+		var sig := spread * (0.75 if _srng.randf() < 0.7 else 1.4)
+		var p := c + Vector3(_srng.randfn(0.0, sig), 0.0, _srng.randfn(0.0, sig))
+		if _srng.randf() < _meadow_weight(p, half):
+			_place("tree", p, half, bushes, flowers)
+	for i in _srng.randi_range(1, 3):
+		var p := c + Vector3(_srng.randfn(0.0, spread), 0.0, _srng.randfn(0.0, spread))
+		_place("rock", p, half, bushes, flowers)
+	for i in _srng.randi_range(3, 6):
+		var a := _srng.randf() * TAU
+		var p := c + Vector3(cos(a), 0.0, sin(a)) * spread * _srng.randf_range(1.1, 1.6)
+		_place("bush", p, half, bushes, flowers)
+
+
+## A ring of single trees on an irregular curve TREELINE_NEAR-TREELINE_FAR units out on the
+## left, right and top. Walked at 1.6-2.4 unit steps with jitter, and skipped in places
+## (random gaps plus a slow wobble) so it reads as a forest edge, not a wall.
+func _build_treeline(half: Vector2) -> void:
+	var mid := (TREELINE_NEAR + TREELINE_FAR) * 0.5
+	var amp := (TREELINE_FAR - TREELINE_NEAR) * 0.5
+	var phase0 := _srng.randf_range(0.0, TAU)
+	for side in 3: # 0 left, 1 right, 2 top
+		var phase := phase0 + side * 1.7
+		var start := -half.y - 8.0 if side < 2 else -half.x - 6.0
+		var stop := half.y + 2.0 if side < 2 else half.x + 6.0 # the south end tapers off
+		var along := start
+		while along < stop:
+			var depth := maxf(TREE_PAD + 0.2, mid + amp * 0.7 * sin(along * 0.31 + phase) + amp * 0.3 * sin(along * 0.87 + phase * 2.3) + _srng.randf_range(-0.4, 0.4))
+			var lat := _srng.randf_range(-0.5, 0.5)
+			var gap := sin(along * 0.23 + phase) > 0.55 or _srng.randf() < 0.12
+			if not gap:
+				var p: Vector3
+				if side == 0:
+					p = Vector3(-half.x - depth, 0.0, along + lat)
+				elif side == 1:
+					p = Vector3(half.x + depth, 0.0, along + lat)
+				else:
+					p = Vector3(along + lat, 0.0, -half.y - depth)
+				_add_tree(p, half)
+			along += _srng.randf_range(1.6, 2.4)
 
 
 func _clear_of_board(p: Vector3, half: Vector2, pad: float) -> bool:
@@ -343,11 +426,9 @@ func _place(kind: String, p: Vector3, half: Vector2, bushes: Array, flowers: Arr
 	var south := p.z > half.y and absf(p.x) < half.x + 4.0
 	match kind:
 		"tree":
-			if south or not _clear_of_board(p, half, SCATTER_PAD + 1.0):
+			if south or not _clear_of_board(p, half, TREE_PAD):
 				return
-			var tree_model := "detail-tree" if _srng.randf() < 0.6 else "detail-tree-large"
-			var tree_s := KIT * _srng.randf_range(1.0, 1.7)
-			_add(tree_model, Transform3D(Basis(Vector3.UP, _srng.randf() * TAU).scaled(Vector3.ONE * tree_s), Vector3(p.x, 0.0, p.z)))
+			_add_tree(p, half)
 		"rock":
 			if not _clear_of_board(p, half, SCATTER_PAD + 0.5):
 				return
@@ -360,6 +441,19 @@ func _place(kind: String, p: Vector3, half: Vector2, bushes: Array, flowers: Arr
 		_:
 			if _clear_of_board(p, half, SCATTER_PAD):
 				_flower_patch(p, flowers)
+
+
+## One tree at p. Near the board the trees are small detail trees and a little bigger;
+## the large kit trees and the bigger scales take over further out.
+func _add_tree(p: Vector3, half: Vector2) -> void:
+	var d := _edge_dist(p, half)
+	var k := clampf((d - 5.0) / 12.0, 0.0, 1.0)
+	var large := _srng.randf() < clampf((d - NEAR_TREE) / 10.0 + 0.25, 0.25, 0.75)
+	var tree_model := "detail-tree-large" if large else "detail-tree"
+	var tree_s := KIT * _srng.randf_range(lerpf(0.9, 1.1, k), lerpf(1.4, 1.8, k))
+	# the treeline past FAR_TREE goes in its own batch without outlines (half the cost)
+	var key := tree_model + ("|far" if d > FAR_TREE else "")
+	_add(key, Transform3D(Basis(Vector3.UP, _srng.randf() * TAU).scaled(Vector3.ONE * tree_s), Vector3(p.x, 0.0, p.z)))
 
 
 ## A bush is 2-3 squashed spheres of one green, sitting on y = 0.
@@ -422,9 +516,9 @@ func _flush_batches() -> void:
 			tint = Color(0.93, 0.97, 0.9)
 		elif "rock" in model:
 			tint = Color(1.0, 0.96, 0.82) # warm the kit's lavender stone to a natural grey
-		var outline: bool = model.begins_with("detail") or model in ["tile-tree", "tile-tree-double", "tile-tree-quad", "tile-rock"]
-		# outer meadow tiles are flat ground: no shadows
-		var shadows: bool = not str(key).begins_with("tile|o")
+		var outline: bool = (model.begins_with("detail") or model in ["tile-tree", "tile-tree-double", "tile-tree-quad", "tile-rock"]) and suffix != "far"
+		# outer meadow tiles are flat ground and far trees sit outside the action: neither casts shadows
+		var shadows: bool = not str(key).begins_with("tile|o") and suffix != "far"
 		for part in _mesh_of(model):
 			var list := []
 			for x in xforms:

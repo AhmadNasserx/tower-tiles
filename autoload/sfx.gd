@@ -33,10 +33,20 @@ var _music_a: AudioStreamPlayer
 var _music_b: AudioStreamPlayer
 var _current_music := ""
 var _music_tween: Tween
+var _web := false
+## Web only: browsers keep audio suspended until the page gets a user gesture.
+## While locked, sfx are dropped and the latest music request is remembered.
+var _web_locked := false
+var _web_poll := 0.0
+var _has_pending_music := false
+var _pending_track := ""
+var _pending_fade := 1.0
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_web = OS.has_feature("web")
+	_web_locked = _web
 	_ensure_bus("Music")
 	_ensure_bus("SFX")
 	for n in NAMES:
@@ -44,6 +54,7 @@ func _ready() -> void:
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = "SFX"
+		_use_stream_playback(p)
 		add_child(p)
 		_pool.append(p)
 	_music_a = _make_music_player()
@@ -58,8 +69,41 @@ func _make_music_player() -> AudioStreamPlayer:
 	var p := AudioStreamPlayer.new()
 	p.bus = "Music"
 	p.volume_db = -80
+	_use_stream_playback(p)
 	add_child(p)
 	return p
+
+
+## Web exports default to Sample playback, which ignores the runtime-created
+## buses, pitch_scale and volume tweens used here. Stream playback matches desktop.
+func _use_stream_playback(p: AudioStreamPlayer) -> void:
+	if _web:
+		p.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+
+
+func _process(delta: float) -> void:
+	if not _web_locked:
+		return
+	_web_poll -= delta
+	if _web_poll > 0.0:
+		return
+	_web_poll = 0.2
+	if _browser_audio_running():
+		_web_locked = false
+		if _has_pending_music:
+			_has_pending_music = false
+			_play_music(_pending_track, _pending_fade)
+
+
+## True once the browser has let the audio context run. window.__ttAudio is
+## installed by html/head_include in export_presets.cfg, which also resumes the
+## context on the first click, tap or key press. Without it, never block.
+func _browser_audio_running() -> bool:
+	if not Engine.has_singleton("JavaScriptBridge"):
+		return true
+	var js = Engine.get_singleton("JavaScriptBridge")
+	var ok = js.eval("!window.__ttAudio || window.__ttAudio.running()", true)
+	return ok == null or bool(ok)
 
 
 func _ensure_bus(bus_name: String) -> void:
@@ -85,6 +129,8 @@ func _set_bus(bus_name: String, linear: float) -> void:
 
 ## Plays a sound. pitch_var randomizes pitch by +/- that fraction.
 func play(sfx_name: String, pitch: float = 1.0, pitch_var: float = 0.08, volume_db: float = 0.0) -> void:
+	if _web_locked:
+		return
 	var stream: AudioStream = _streams.get(sfx_name)
 	if stream == null:
 		return
@@ -104,6 +150,15 @@ func play(sfx_name: String, pitch: float = 1.0, pitch_var: float = 0.08, volume_
 
 
 func music(track: String, fade: float = 1.0) -> void:
+	if _web_locked:
+		_has_pending_music = true
+		_pending_track = track
+		_pending_fade = fade
+		return
+	_play_music(track, fade)
+
+
+func _play_music(track: String, fade: float) -> void:
 	if track == _current_music:
 		return
 	_current_music = track

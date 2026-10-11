@@ -9,15 +9,18 @@ const PITCH := deg_to_rad(-56.0)
 const SHOT_IN := 0.55
 const SHOT_HOLD := 1.5
 const SHOT_OUT := 0.55
-## Face cam: degrees the camera sits off the boss's nose, degrees below the head
-## (negative = low, looking up), distance per unit of boss size (clamped to 3.5..5),
-## dolly-in over the hold, FOV narrowing over the hold, and the lowest camera height.
-const SHOT_YAW := 15.0
-const SHOT_ELEV := -8.0
-const SHOT_DIST := 4.2
-const SHOT_PUSH := 0.4
+## Face cam: degrees the camera sits off the boss's nose, degrees below the aim point
+## (negative = low, looking up), distance per unit of boss size (clamped to 6.5..10),
+## dolly-in over the hold (world units), FOV narrowing over the hold, and the lowest
+## camera height. The aim point is SHOT_AIM of the boss's height, a bit under the
+## head centre, so the face lands in the upper-middle of the frame.
+const SHOT_YAW := 18.0
+const SHOT_ELEV := -4.0
+const SHOT_DIST := 8.5
+const SHOT_PUSH := 0.8
 const SHOT_FOV_NARROW := 4.0
-const SHOT_MIN_Y := 0.6
+const SHOT_MIN_Y := 1.2
+const SHOT_AIM := 0.6
 
 var focus := Vector3.ZERO
 var bounds := Vector2(20, 12)
@@ -152,17 +155,17 @@ func _cine_done() -> void:
 
 
 ## Where the face cam sits for `boss` right now: in front of its head, a little to
-## one side, below eye level, aimed at the head. Uses the boss's current position,
+## one side, below the aim point, aimed at it. Uses the boss's current position,
 ## so it follows the boss while the shot runs.
 func _face_transform(boss: Enemy) -> Transform3D:
-	var head := boss.global_position + Vector3(0.0, boss.height * 0.75, 0.0)
+	var aim := boss.global_position + Vector3(0.0, boss.height * SHOT_AIM, 0.0)
 	var front := boss.facing()
 	var side := front.rotated(Vector3.UP, deg_to_rad(SHOT_YAW))
 	var el := deg_to_rad(SHOT_ELEV)
-	var dist := clampf(SHOT_DIST * boss.size, 3.5, 5.0) - SHOT_PUSH * _cine_push
-	var pos := head + (side * cos(el) + Vector3.UP * sin(el)) * dist
+	var dist := clampf(SHOT_DIST * boss.size, 6.5, 10.0) - SHOT_PUSH * _cine_push
+	var pos := aim + (side * cos(el) + Vector3.UP * sin(el)) * dist
 	pos.y = maxf(pos.y, SHOT_MIN_Y)
-	return Transform3D(Basis.IDENTITY, pos).looking_at(head, Vector3.UP)
+	return Transform3D(Basis.IDENTITY, pos).looking_at(aim, Vector3.UP)
 
 
 ## The gameplay camera transform (no shake), from focus and zoom.

@@ -41,6 +41,10 @@ var _banner_title: Label
 var _banner_sub: Label
 var _banner_tween: Tween
 var _boss_card: Control
+var _card_active := false # true while the boss title card is on screen
+var _gameplay: Control # every gameplay widget lives under this, so a cinematic can fade them together
+var _gameplay_tw: Tween
+var _cinematic := false
 var _toasts: VBoxContainer
 var _vignette: TextureRect
 var _zoom_tint: TextureRect
@@ -64,6 +68,11 @@ func _ready() -> void:
 
 	_vignette = _make_vignette(Color("e8484f"))
 	_zoom_tint = _make_vignette(Color("a66cff"))
+	# added after the vignettes so the widgets draw over them, as before
+	_gameplay = Control.new()
+	_gameplay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_gameplay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_gameplay)
 	_build_top_left()
 	_build_top_center()
 	_build_top_right()
@@ -86,7 +95,7 @@ func _ready() -> void:
 
 # ------------------------------------------------------------------ layout
 func _anchored(c: Control, preset: Control.LayoutPreset, offset := Vector2.ZERO) -> Control:
-	root.add_child(c)
+	_gameplay.add_child(c)
 	c.set_anchors_and_offsets_preset(preset, Control.PRESET_MODE_MINSIZE, 10)
 	c.position += offset
 	return c
@@ -380,7 +389,7 @@ func _build_hint() -> void:
 	_hint.add_child(h)
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint.visible = false
-	root.add_child(_hint)
+	_gameplay.add_child(_hint)
 
 
 # ------------------------------------------------------------------ per frame
@@ -412,7 +421,8 @@ func _process(delta: float) -> void:
 			_rebuild_preview()
 
 	var b: Enemy = game.boss
-	_boss_box.visible = b != null and is_instance_valid(b) and b.alive
+	# the title card already names the boss, so the small bar waits until it has finished
+	_boss_box.visible = not _card_active and b != null and is_instance_valid(b) and b.alive
 	if _boss_box.visible:
 		UIKit.ribbon_set_text(_boss_name, b.def.name.to_upper())
 		_update_boss_bar(b)
@@ -599,6 +609,25 @@ func banner(title: String, sub: String, hold_or_color: Variant = 1.6, hold := -1
 	_banner_tween.parallel().tween_property(_banner, "position:y", _banner.position.y - 30.0, 0.35)
 
 
+## Fades the gameplay widgets (chips, build bar, abilities, buttons, hint) out for a
+## cinematic, and back in afterwards. The title card, banner, modals and the damage
+## and zoom vignettes sit outside that container and are not touched. Hidden widgets
+## are also made invisible, so they take no clicks until the fade back in.
+func set_cinematic(on: bool) -> void:
+	if on == _cinematic:
+		return
+	_cinematic = on
+	if _gameplay_tw and _gameplay_tw.is_valid():
+		_gameplay_tw.kill()
+	_gameplay_tw = create_tween().set_ignore_time_scale(true)
+	if on:
+		_gameplay_tw.tween_property(_gameplay, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_gameplay_tw.tween_callback(func(): _gameplay.visible = false)
+	else:
+		_gameplay.visible = true
+		_gameplay_tw.tween_property(_gameplay, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
 ## Boss entrance card: letterbox bars slide in, the boss name bounces in large
 ## in UIKit red, a blurb fades in beneath, then everything fades after ~2s.
 ## Replaces any card still showing. Mouse input passes straight through.
@@ -617,6 +646,7 @@ func boss_title_card(boss_name: String, subtitle: String) -> void:
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(card)
 	_boss_card = card
+	_card_active = true
 
 	# [resting y, off-screen starting y] for the top and bottom bars
 	for bar in [[0.0, -bar_h], [vp.y - bar_h, vp.y]]:
@@ -634,7 +664,8 @@ func boss_title_card(boss_name: String, subtitle: String) -> void:
 	title.size = Vector2(vp.x, 80.0)
 	title.pivot_offset = title.size * 0.5
 	card.add_child(title)
-	var rest := Vector2(0, vp.y * 0.4 - 40.0)
+	# sits low, under the face the camera frames in the upper-middle of the screen
+	var rest := Vector2(0, vp.y * 0.65 - 40.0)
 	title.position = rest + Vector2(vp.x * 0.2, 0)
 	title.scale = Vector2.ONE * 1.5
 	title.modulate.a = 0.0
@@ -659,7 +690,9 @@ func boss_title_card(boss_name: String, subtitle: String) -> void:
 	var tw := card.create_tween().set_ignore_time_scale(true)
 	tw.tween_interval(2.0)
 	tw.tween_property(card, "modulate:a", 0.0, 0.45)
-	tw.tween_callback(card.queue_free)
+	tw.tween_callback(func():
+		_card_active = false
+		card.queue_free())
 
 
 func toast(text: String, color := UIKit.CREAM) -> void:

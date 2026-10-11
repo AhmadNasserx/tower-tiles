@@ -89,6 +89,7 @@ var _demo_t := 0.0
 var _cine_slow := 1.0 # multiplies the speed setting during the boss intro shot
 var _cine_tw: Tween
 var _intro_boss: Enemy # the boss held still for its intro shot, if any
+var _hud_cine := false # true while the HUD is faded out for the boss intro
 
 
 func _ready() -> void:
@@ -418,6 +419,7 @@ func _boss_intro(b: Enemy) -> void:
 	_release_intro_hold()
 	_intro_boss = b
 	b.begin_intro_hold()
+	_set_intro_hud(true)
 	camera.cinematic_face(b)
 	if _cine_tw and _cine_tw.is_valid():
 		_cine_tw.kill()
@@ -435,11 +437,22 @@ func _intro_roar() -> void:
 		_intro_boss.roar()
 
 
-## Lets the intro boss walk again. Safe to call when it is already gone.
+## Lets the intro boss walk again and brings the HUD back. Safe to call when the boss
+## is already gone, and when no intro is running.
 func _release_intro_hold() -> void:
 	if is_instance_valid(_intro_boss):
 		_intro_boss.intro_hold = false
 	_intro_boss = null
+	_set_intro_hud(false)
+
+
+## Fades the gameplay HUD out for the intro (true) or back in (false). Only acts on a change.
+func _set_intro_hud(on: bool) -> void:
+	if _hud_cine == on:
+		return
+	_hud_cine = on
+	if is_instance_valid(hud):
+		hud.set_cinematic(on)
 
 
 ## Ends the intro early (the boss died or leaked) and hands speed back.
@@ -466,6 +479,8 @@ func _exit_tree() -> void:
 	if _cine_slow != 1.0:
 		_cine_slow = 1.0
 		Engine.time_scale = 1.0
+	# the intro tween is gone, so bring the HUD back here rather than leave it faded
+	_set_intro_hud(false)
 
 
 func _wave_cleared() -> void:

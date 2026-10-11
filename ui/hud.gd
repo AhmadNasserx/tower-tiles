@@ -38,6 +38,7 @@ var _banner_ribbon: PanelContainer
 var _banner_title: Label
 var _banner_sub: Label
 var _banner_tween: Tween
+var _boss_card: Control
 var _toasts: VBoxContainer
 var _vignette: TextureRect
 var _zoom_tint: TextureRect
@@ -553,6 +554,69 @@ func banner(title: String, sub: String, hold_or_color: Variant = 1.6, hold := -1
 	_banner_tween.tween_interval(h)
 	_banner_tween.tween_property(_banner, "modulate:a", 0.0, 0.35)
 	_banner_tween.parallel().tween_property(_banner, "position:y", _banner.position.y - 30.0, 0.35)
+
+
+## Boss entrance card: letterbox bars slide in, the boss name bounces in large
+## in UIKit red, a blurb fades in beneath, then everything fades after ~2s.
+## Replaces any card still showing. Mouse input passes straight through.
+func boss_title_card(boss_name: String, subtitle: String) -> void:
+	if is_instance_valid(_boss_card):
+		_boss_card.queue_free()
+	# the card takes the centre of the screen, so the ordinary banner steps aside
+	if _banner_tween:
+		_banner_tween.kill()
+	_banner.modulate.a = 0.0
+
+	var vp := root.size
+	var bar_h := clampf(vp.y * 0.14, 56.0, 120.0)
+	var card := Control.new()
+	card.set_anchors_preset(Control.PRESET_FULL_RECT)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(card)
+	_boss_card = card
+
+	# [resting y, off-screen starting y] for the top and bottom bars
+	for bar in [[0.0, -bar_h], [vp.y - bar_h, vp.y]]:
+		var r := ColorRect.new()
+		r.color = Color(UIKit.OUTLINE, 0.92)
+		r.size = Vector2(vp.x, bar_h)
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(r)
+		r.position = Vector2(0, bar[1])
+		r.create_tween().set_ignore_time_scale(true).tween_property(r, "position:y", bar[0], 0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+	var title := UIKit.label(boss_name.to_upper(), 64, UIKit.RED, 10, true)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.size = Vector2(vp.x, 80.0)
+	title.pivot_offset = title.size * 0.5
+	card.add_child(title)
+	var rest := Vector2(0, vp.y * 0.4 - 40.0)
+	title.position = rest + Vector2(vp.x * 0.2, 0)
+	title.scale = Vector2.ONE * 1.5
+	title.modulate.a = 0.0
+	var tt := title.create_tween().set_ignore_time_scale(true)
+	tt.tween_interval(0.15)
+	tt.tween_property(title, "modulate:a", 1.0, 0.12)
+	tt.parallel().tween_property(title, "position", rest, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tt.parallel().tween_property(title, "scale", Vector2.ONE, 0.55).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	var sub := UIKit.label(subtitle, 26, UIKit.CREAM, 8, true)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sub.size = Vector2(vp.x, 40.0)
+	sub.position = rest + Vector2(0, 86.0)
+	sub.modulate.a = 0.0
+	card.add_child(sub)
+	var st := sub.create_tween().set_ignore_time_scale(true)
+	st.tween_interval(0.5)
+	st.tween_property(sub, "modulate:a", 1.0, 0.3)
+
+	# hold, then fade the whole card; freeing it takes its tweens along
+	var tw := card.create_tween().set_ignore_time_scale(true)
+	tw.tween_interval(2.0)
+	tw.tween_property(card, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(card.queue_free)
 
 
 func toast(text: String, color := UIKit.CREAM) -> void:

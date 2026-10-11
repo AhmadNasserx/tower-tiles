@@ -33,7 +33,7 @@ Your cat lives at the top of a tower. The neighborhood pack wants in. Build a sq
 Every kitten has 4 levels (its tower grows, max level gets a golden flag), targeting modes (First / Last / Strong / Close) and sells back for 70%.
 
 ### The pack
-Pups (weak), Hounds, Foxes (very fast), Boars (armored, cost 2 lives), Nurse Bunnies (heal their friends), and two bosses: the **Alpha Hound** (howls to speed up the pack) and **Big Ellie** the elephant (stomps and jams nearby kittens).
+Pups (weak), Hounds, Foxes (very fast), Boars (armored, cost 2 lives), Nurse Bunnies (heal nearby friends, but are frail and take extra damage), and two bosses: the **Alpha Hound** (howls to speed up the pack) and **Big Ellie** the elephant (stomps and jams nearby kittens).
 
 ### Upgrades: three layers
 1. **In-run:** level kittens up with gold.

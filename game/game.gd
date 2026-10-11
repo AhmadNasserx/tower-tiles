@@ -86,6 +86,8 @@ var _ghost: Node3D
 var _ghost_mat: StandardMaterial3D
 var _paw_marker: MeshInstance3D
 var _demo_t := 0.0
+var _cine_slow := 1.0 # multiplies the speed setting during the boss intro shot
+var _cine_tw: Tween
 
 
 func _ready() -> void:
@@ -322,7 +324,7 @@ func _process(delta: float) -> void:
 
 
 func _update_time_scale(real_delta: float) -> void:
-	var target: float = SPEEDS[speed_index]
+	var target: float = SPEEDS[speed_index] * _cine_slow
 	if _hitstop > 0.0:
 		_hitstop -= real_delta
 		target *= _hitstop_scale
@@ -375,7 +377,7 @@ func _wave_flavor() -> String:
 		"hound": return "Hounds incoming! Sturdier than pups."
 		"greyhound": return "Foxes! They are FAST."
 		"bulldog": return "Boars! Armored. Big hits work best."
-		"poodle": return "Nurse Bunnies heal their friends. Focus them!"
+		"poodle": return "Nurse Bunnies heal nearby pals, but they're frail. Focus them!"
 	var lines := ["Here they come!", "Woof woof squeak.", "Protect the nap spot!", "Stay pawsitive!",
 		"Hiss-teria incoming.", "Fur real now.", "The pack smells treats.", "Claws out!"]
 	return lines[wave % lines.size()]
@@ -399,10 +401,48 @@ func _spawn(type: String) -> void:
 			Sfx.play("boss", 1.0, 0.0)
 			Sfx.music("boss")
 			shake(0.5)
+			_boss_intro(e)
 			if hud:
-				hud.banner(e.def.name.to_upper(), "Boss incoming!", GameData.C_RED)
+				hud.boss_title_card(e.def.name, _boss_blurb(type))
 			tower.cat.puff_up()
 			Sfx.play("yowl", 1.0, 0.0, -4.0)
+
+
+## Slows game time and frames the boss for a 2.2s intro shot. The slow-mo is a
+## multiplier on the player's speed setting, so 2x/3x and pause still apply.
+func _boss_intro(b: Enemy) -> void:
+	camera.cinematic_focus(Vector3(b.global_position.x, 0.0, b.global_position.z), 0.55, 2.2)
+	if _cine_tw and _cine_tw.is_valid():
+		_cine_tw.kill()
+	_cine_tw = create_tween().set_ignore_time_scale(true)
+	_cine_tw.tween_property(self, "_cine_slow", 0.25, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_cine_tw.tween_interval(1.4)
+	_cine_tw.tween_property(self, "_cine_slow", 1.0, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## Ends the intro early (the boss died or leaked) and hands speed back.
+func _end_boss_intro() -> void:
+	if _cine_tw and _cine_tw.is_valid():
+		_cine_tw.kill()
+	_cine_slow = 1.0
+	camera.end_cinematic()
+
+
+func _boss_blurb(type: String) -> String:
+	match type:
+		"alpha":
+			return "Rallies the pack into a frenzy"
+		"vacuum":
+			return "Stomps and jams your towers"
+	return "Boss incoming!"
+
+
+func _exit_tree() -> void:
+	if _cine_tw and _cine_tw.is_valid():
+		_cine_tw.kill()
+	if _cine_slow != 1.0:
+		_cine_slow = 1.0
+		Engine.time_scale = 1.0
 
 
 func _wave_cleared() -> void:
@@ -487,6 +527,7 @@ func on_enemy_killed(e: Enemy) -> void:
 		Sfx.play("die" if randf() < 0.5 else "die2", 1.0 / sqrt(e.size * 1.5), 0.12)
 	if e.is_boss:
 		boss = null
+		_end_boss_intro()
 		if not demo:
 			hitstop(0.35, 0.08)
 			shake(0.8)
@@ -503,6 +544,7 @@ func on_enemy_leaked(e: Enemy) -> void:
 	enemies.erase(e)
 	if e == boss:
 		boss = null
+		_end_boss_intro()
 	if demo or not playing:
 		return
 	lose_lives(e.lives)
@@ -539,12 +581,16 @@ func splash_damage(source: Node, pos: Vector3, radius: float, dmg: float, crit: 
 func poodle_heal(p: Enemy) -> void:
 	var healed := false
 	for e: Enemy in enemies:
-		if e.alive and e != p and e.hp < e.max_hp and e.global_position.distance_to(p.global_position) < 3.5:
-			e.heal(0.08)
+		# bosses and other bunnies are never healed; each enemy gets at most one heal per cooldown
+		if not e.alive or e == p or e.is_boss or e.def.get("healer", false):
+			continue
+		if e.hp < e.max_hp and e.heal_cooldown <= 0.0 and e.global_position.distance_to(p.global_position) < GameData.BUNNY_HEAL_RADIUS:
+			e.heal(GameData.BUNNY_HEAL_FRAC)
+			e.heal_cooldown = GameData.BUNNY_HEAL_COOLDOWN
 			fx.heal(e.global_position)
 			healed = true
 	if healed:
-		fx.ring(p.global_position + Vector3(0, 0.2, 0), 3.5, GameData.C_GREEN, 0.5)
+		fx.ring(p.global_position + Vector3(0, 0.2, 0), GameData.BUNNY_HEAL_RADIUS, GameData.C_GREEN, 0.5)
 		if not demo:
 			Sfx.play("heal")
 

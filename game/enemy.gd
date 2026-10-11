@@ -26,12 +26,15 @@ var stun_time := 0.0
 var haste_time := 0.0
 var hp_display := 1.0
 var last_hit_time := -10.0
+var damage_taken_mult := 1.0
+var heal_cooldown := 0.0
 
 var rig: PetRig
 var height := 1.0
 var _model: Node3D
 var _anim_t := randf() * 10.0
 var _ability_t := 0.0
+var _cast_t := 0.0
 var _dir := Vector3.FORWARD
 var _squish := 0.0
 
@@ -45,6 +48,7 @@ func setup(p_game: Game, p_type: String, p_curve: Curve3D, wave_hp_mult: float) 
 	max_hp = def.hp * wave_hp_mult
 	hp = max_hp
 	armor = def.armor
+	damage_taken_mult = def.get("vuln", 1.0)
 	base_speed = def.speed * randf_range(0.95, 1.05)
 	gold = def.gold
 	lives = def.lives
@@ -78,6 +82,8 @@ func _process(delta: float) -> void:
 			slow_amount = 0.0
 	if haste_time > 0.0:
 		haste_time -= delta
+	if heal_cooldown > 0.0:
+		heal_cooldown -= delta
 	dist += spd * delta
 	_update_transform(delta)
 	_animate(delta, spd)
@@ -85,8 +91,14 @@ func _process(delta: float) -> void:
 	if def.get("healer", false):
 		_ability_t -= delta
 		if _ability_t <= 0.0:
-			_ability_t = 2.5
-			game.poodle_heal(self)
+			# wind-up: stop in place, then heal once the cast finishes
+			_ability_t = GameData.BUNNY_HEAL_INTERVAL
+			_cast_t = GameData.BUNNY_WINDUP
+			apply_stun(GameData.BUNNY_WINDUP)
+		if _cast_t > 0.0:
+			_cast_t -= delta
+			if _cast_t <= 0.0:
+				game.poodle_heal(self)
 	elif is_boss:
 		_ability_t -= delta
 		if _ability_t <= 0.0:
@@ -149,7 +161,8 @@ func progress() -> float:
 func take_damage(amount: float, crit := false, show_number := true) -> void:
 	if not alive:
 		return
-	var real := maxf(amount * 0.2, amount - armor)
+	var dmg := amount * damage_taken_mult
+	var real := maxf(dmg * 0.2, dmg - armor)
 	hp -= real
 	last_hit_time = Time.get_ticks_msec() / 1000.0
 	_flash()

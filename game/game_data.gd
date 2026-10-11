@@ -80,6 +80,13 @@ const TURRET_ORDER := ["yarn", "hiss", "fish", "laser", "fatcat"]
 const TARGET_MODES := ["First", "Last", "Strong", "Close"]
 
 # ------------------------------------------------------------------ dogs
+# Nurse Bunny healing (used by Enemy._process and Game.poodle_heal)
+const BUNNY_HEAL_FRAC := 0.03      # share of the target's max HP per heal
+const BUNNY_HEAL_INTERVAL := 4.0   # seconds between heal casts
+const BUNNY_HEAL_RADIUS := 2.5     # heal range in world units
+const BUNNY_HEAL_COOLDOWN := 3.0   # seconds before the same enemy can be healed again
+const BUNNY_WINDUP := 0.4          # seconds the bunny is stunned while casting a heal
+
 const ENEMIES := {
 	"pup": {"name": "Pup", "hp": 26.0, "speed": 3.6, "armor": 0.0, "gold": 3, "lives": 1,
 		"model": "dog", "scale": 0.39, "tint": Color(1, 1, 1), "coat": Color("e09a4f"), "threat": 1.0, "interval": 0.55},
@@ -87,8 +94,9 @@ const ENEMIES := {
 		"model": "dog", "scale": 0.55, "tint": Color(0.8, 0.62, 0.5), "coat": Color("a0643b"), "threat": 2.0, "interval": 0.8},
 	"greyhound": {"name": "Fox", "hp": 40.0, "speed": 5.4, "armor": 0.0, "gold": 5, "lives": 1,
 		"model": "fox", "scale": 0.48, "tint": Color(1, 1, 1), "coat": Color("ff8a3d"), "threat": 2.0, "interval": 0.6},
-	"poodle": {"name": "Nurse Bunny", "hp": 90.0, "speed": 2.5, "armor": 0.0, "gold": 9, "lives": 1,
-		"model": "bunny", "scale": 0.49, "tint": Color(1.25, 1.0, 1.15), "coat": Color("f59ac8"), "threat": 4.0, "interval": 1.2, "healer": true},
+	"poodle": {"name": "Nurse Bunny", "hp": 70.0, "speed": 2.2, "armor": 0.0, "gold": 9, "lives": 1,
+		"model": "bunny", "scale": 0.49, "tint": Color(1.25, 1.0, 1.15), "coat": Color("f59ac8"), "threat": 4.0, "interval": 1.2, "healer": true,
+		"vuln": 1.25},
 	"bulldog": {"name": "Boar", "hp": 180.0, "speed": 1.7, "armor": 3.0, "gold": 11, "lives": 2,
 		"model": "hog", "scale": 0.63, "tint": Color(1, 1, 1), "coat": Color("c46a4a"), "threat": 5.0, "interval": 1.6},
 	"alpha": {"name": "Alpha Hound", "hp": 620.0, "speed": 1.5, "armor": 3.0, "gold": 120, "lives": 3,

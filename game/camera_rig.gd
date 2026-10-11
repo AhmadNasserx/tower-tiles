@@ -19,6 +19,18 @@ var _intro := 0.0
 var _kick := Vector2.ZERO
 var _center := Vector3.ZERO
 
+# Boss intro shot: `_cine_w` blends from the framing at the start of the shot
+# (`_cine_from*`) to the close-up (`_cine_to*`) and back again.
+var _cine_on := false
+var _cine_w := 0.0
+var _cine_from := Vector3.ZERO
+var _cine_from_zoom := 1.0
+var _cine_to := Vector3.ZERO
+var _cine_to_zoom := 1.0
+var _cine_return_focus := Vector3.ZERO
+var _cine_return_zoom := 1.0
+var _cine_tw: Tween
+
 
 func setup(map_size: Vector2) -> void:
 	bounds = map_size * 0.5
@@ -79,7 +91,54 @@ func kick(dir: Vector2) -> void:
 		_kick += dir
 
 
+## Boss intro: frames the camera close on `target` (a ground point), holds, then
+## glides back to the framing it had before. `duration` is the whole shot in
+## real seconds. Pan and zoom input is ignored until the shot has returned.
+func cinematic_focus(target: Vector3, close_zoom: float, duration: float) -> void:
+	if not _cine_on:
+		_cine_on = true
+		_cine_from = focus
+		_cine_from_zoom = zoom
+		_cine_return_focus = _focus_target
+		_cine_return_zoom = _zoom_target
+	_cine_to = target
+	_cine_to_zoom = close_zoom
+	if _cine_tw and _cine_tw.is_valid():
+		_cine_tw.kill()
+	var t_in := duration * 0.25
+	var t_out := duration * 0.3
+	_cine_tw = create_tween().set_ignore_time_scale(true)
+	_cine_tw.tween_property(self, "_cine_w", 1.0, t_in).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_interval(duration - t_in - t_out)
+	_cine_tw.tween_property(self, "_cine_w", 0.0, t_out).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_callback(_cine_done)
+
+
+## Cuts a running shot short (e.g. the boss died) and glides back.
+func end_cinematic() -> void:
+	if not _cine_on:
+		return
+	if _cine_tw and _cine_tw.is_valid():
+		_cine_tw.kill()
+	_cine_tw = create_tween().set_ignore_time_scale(true)
+	_cine_tw.tween_property(self, "_cine_w", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_callback(_cine_done)
+
+
+func _cine_done() -> void:
+	_cine_on = false
+	_cine_w = 0.0
+	focus = _cine_from
+	zoom = _cine_from_zoom
+	# Hand framing back to the normal smoothing, aimed where it was aiming.
+	_focus_target = _cine_return_focus
+	_zoom_target = _cine_return_zoom
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _cine_on:
+		_dragging = false
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
@@ -109,20 +168,25 @@ func _clamp_focus() -> void:
 func _process(delta: float) -> void:
 	var real_delta := delta / maxf(Engine.time_scale, 0.01)
 	_t += real_delta
-	var pan := Vector3.ZERO
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		pan.z -= 1
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		pan.z += 1
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		pan.x -= 1
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		pan.x += 1
-	if pan != Vector3.ZERO:
-		_focus_target += pan * real_delta * 18.0 * zoom
-		_clamp_focus()
-	zoom = lerpf(zoom, _zoom_target, 1.0 - exp(-real_delta * 10.0))
-	focus = focus.lerp(_focus_target, 1.0 - exp(-real_delta * (3.0 if _intro > 0.0 else 10.0)))
+	if _cine_on:
+		# The shot owns framing; keyboard pan and the usual smoothing wait.
+		focus = _cine_from.lerp(_cine_to, _cine_w)
+		zoom = lerpf(_cine_from_zoom, _cine_to_zoom, _cine_w)
+	else:
+		var pan := Vector3.ZERO
+		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+			pan.z -= 1
+		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+			pan.z += 1
+		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+			pan.x -= 1
+		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+			pan.x += 1
+		if pan != Vector3.ZERO:
+			_focus_target += pan * real_delta * 18.0 * zoom
+			_clamp_focus()
+		zoom = lerpf(zoom, _zoom_target, 1.0 - exp(-real_delta * 10.0))
+		focus = focus.lerp(_focus_target, 1.0 - exp(-real_delta * (3.0 if _intro > 0.0 else 10.0)))
 	_intro = maxf(0.0, _intro - real_delta)
 	_trauma = maxf(0.0, _trauma - real_delta * 1.6)
 	_kick = _kick.lerp(Vector2.ZERO, 1.0 - exp(-real_delta * 12.0))

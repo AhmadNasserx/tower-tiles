@@ -1,8 +1,23 @@
 class_name CameraRig
 extends Camera3D
-## Angled tabletop camera with trauma-based screen shake, zoom and drag-pan.
+## Angled tabletop camera with trauma-based screen shake, zoom and drag-pan,
+## plus the boss intro face-cam shot (see cinematic_face).
 
 const PITCH := deg_to_rad(-56.0)
+## Boss intro shot timing in real seconds: move in, hold, move back (2.6s total,
+## to match the HUD title card).
+const SHOT_IN := 0.55
+const SHOT_HOLD := 1.5
+const SHOT_OUT := 0.55
+## Face cam: degrees the camera sits off the boss's nose, degrees below the head
+## (negative = low, looking up), distance per unit of boss size (clamped to 3.5..5),
+## dolly-in over the hold, FOV narrowing over the hold, and the lowest camera height.
+const SHOT_YAW := 15.0
+const SHOT_ELEV := -8.0
+const SHOT_DIST := 4.2
+const SHOT_PUSH := 0.4
+const SHOT_FOV_NARROW := 4.0
+const SHOT_MIN_Y := 0.6
 
 var focus := Vector3.ZERO
 var bounds := Vector2(20, 12)
@@ -19,17 +34,18 @@ var _intro := 0.0
 var _kick := Vector2.ZERO
 var _center := Vector3.ZERO
 
-# Boss intro shot: `_cine_w` blends from the framing at the start of the shot
-# (`_cine_from*`) to the close-up (`_cine_to*`) and back again.
+# Boss intro shot: `_cine_w` blends from the gameplay camera to the face cam
+# (`_face_xf`) and back. `_cine_push` goes 0 -> 1 over the hold (dolly and FOV).
+# Focus and zoom are frozen while the shot runs, so the gameplay framing is
+# exactly what it was when the camera comes back.
 var _cine_on := false
 var _cine_w := 0.0
-var _cine_from := Vector3.ZERO
-var _cine_from_zoom := 1.0
-var _cine_to := Vector3.ZERO
-var _cine_to_zoom := 1.0
-var _cine_return_focus := Vector3.ZERO
-var _cine_return_zoom := 1.0
+var _cine_push := 0.0
+var _cine_fov := 32.0 # gameplay FOV, restored when the shot ends
 var _cine_tw: Tween
+var _face_boss: Enemy
+var _face_live := false
+var _face_xf := Transform3D.IDENTITY
 
 
 func setup(map_size: Vector2) -> void:
@@ -91,30 +107,31 @@ func kick(dir: Vector2) -> void:
 		_kick += dir
 
 
-## Boss intro: frames the camera close on `target` (a ground point), holds, then
-## glides back to the framing it had before. `duration` is the whole shot in
-## real seconds. Pan and zoom input is ignored until the shot has returned.
-func cinematic_focus(target: Vector3, close_zoom: float, duration: float) -> void:
+## Boss intro: the camera moves from the gameplay framing to a face-on close-up of
+## `boss`: in front of its head (along its travel direction), a little to one side,
+## slightly low and looking up at the head. It holds for SHOT_HOLD with a slow
+## dolly-in and FOV narrowing, then glides back to the gameplay framing. The whole
+## shot is SHOT_IN + SHOT_HOLD + SHOT_OUT real seconds. Pan and zoom input is
+## ignored until the shot has returned.
+func cinematic_face(boss: Enemy) -> void:
 	if not _cine_on:
 		_cine_on = true
-		_cine_from = focus
-		_cine_from_zoom = zoom
-		_cine_return_focus = _focus_target
-		_cine_return_zoom = _zoom_target
-	_cine_to = target
-	_cine_to_zoom = close_zoom
+		_cine_fov = fov
+		_cine_push = 0.0
+	_face_boss = boss
+	_face_live = true
+	_face_xf = _face_transform(boss)
 	if _cine_tw and _cine_tw.is_valid():
 		_cine_tw.kill()
-	var t_in := duration * 0.25
-	var t_out := duration * 0.3
 	_cine_tw = create_tween().set_ignore_time_scale(true)
-	_cine_tw.tween_property(self, "_cine_w", 1.0, t_in).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_cine_tw.tween_interval(duration - t_in - t_out)
-	_cine_tw.tween_property(self, "_cine_w", 0.0, t_out).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_property(self, "_cine_w", 1.0, SHOT_IN).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_property(self, "_cine_push", 1.0, SHOT_HOLD).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_property(self, "_cine_w", 0.0, SHOT_OUT).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_cine_tw.tween_callback(_cine_done)
 
 
-## Cuts a running shot short (e.g. the boss died) and glides back.
+## Cuts a running shot short (e.g. the boss died) and glides back. The last face
+## framing is used for the glide, so it works after the boss is gone.
 func end_cinematic() -> void:
 	if not _cine_on:
 		return
@@ -128,11 +145,30 @@ func end_cinematic() -> void:
 func _cine_done() -> void:
 	_cine_on = false
 	_cine_w = 0.0
-	focus = _cine_from
-	zoom = _cine_from_zoom
-	# Hand framing back to the normal smoothing, aimed where it was aiming.
-	_focus_target = _cine_return_focus
-	_zoom_target = _cine_return_zoom
+	_cine_push = 0.0
+	_face_live = false
+	_face_boss = null
+	fov = _cine_fov
+
+
+## Where the face cam sits for `boss` right now: in front of its head, a little to
+## one side, below eye level, aimed at the head. Uses the boss's current position,
+## so it follows the boss while the shot runs.
+func _face_transform(boss: Enemy) -> Transform3D:
+	var head := boss.global_position + Vector3(0.0, boss.height * 0.75, 0.0)
+	var front := boss.facing()
+	var side := front.rotated(Vector3.UP, deg_to_rad(SHOT_YAW))
+	var el := deg_to_rad(SHOT_ELEV)
+	var dist := clampf(SHOT_DIST * boss.size, 3.5, 5.0) - SHOT_PUSH * _cine_push
+	var pos := head + (side * cos(el) + Vector3.UP * sin(el)) * dist
+	pos.y = maxf(pos.y, SHOT_MIN_Y)
+	return Transform3D(Basis.IDENTITY, pos).looking_at(head, Vector3.UP)
+
+
+## The gameplay camera transform (no shake), from focus and zoom.
+func _gameplay_xf() -> Transform3D:
+	var dir := Vector3(0, -sin(PITCH), cos(PITCH)) # from focus back toward the camera
+	return Transform3D(Basis.from_euler(Vector3(PITCH, 0, 0)), focus + _center + dir * _base_dist * zoom)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -169,9 +205,15 @@ func _process(delta: float) -> void:
 	var real_delta := delta / maxf(Engine.time_scale, 0.01)
 	_t += real_delta
 	if _cine_on:
-		# The shot owns framing; keyboard pan and the usual smoothing wait.
-		focus = _cine_from.lerp(_cine_to, _cine_w)
-		zoom = lerpf(_cine_from_zoom, _cine_to_zoom, _cine_w)
+		# The shot owns framing; keyboard pan and the usual smoothing wait. Keep
+		# aiming at the boss's current head. If it was freed, glide back from the
+		# last face framing.
+		if _face_live:
+			if is_instance_valid(_face_boss):
+				_face_xf = _face_transform(_face_boss)
+			else:
+				_face_live = false
+				end_cinematic()
 	else:
 		var pan := Vector3.ZERO
 		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
@@ -194,14 +236,20 @@ func _process(delta: float) -> void:
 
 
 func _apply() -> void:
-	var dist := _base_dist * zoom
-	var dir := Vector3(0, -sin(PITCH), cos(PITCH)) # from focus back toward the camera
-	position = focus + _center + dir * dist
-	rotation = Vector3(PITCH, 0, 0)
 	var s := _trauma * _trauma
+	var roll := sin(_t * 41.0) * s * 0.025
+	var gx := _gameplay_xf()
+	if _cine_on and _cine_w > 0.0:
+		# Blend the gameplay camera into the face cam; the lens narrows during the hold.
+		var q := Quaternion(gx.basis).slerp(Quaternion(_face_xf.basis), _cine_w)
+		transform = Transform3D(Basis(q) * Basis(Vector3.BACK, roll), gx.origin.lerp(_face_xf.origin, _cine_w))
+		fov = lerpf(_cine_fov, _cine_fov - SHOT_FOV_NARROW * _cine_push, _cine_w)
+	else:
+		position = gx.origin
+		rotation = Vector3(PITCH, 0, 0)
+		rotation.z = roll
 	h_offset = (sin(_t * 47.0) * 0.6 + sin(_t * 93.0) * 0.4) * s * 0.9 + _kick.x
 	v_offset = (sin(_t * 53.0 + 1.3) * 0.6 + sin(_t * 87.0) * 0.4) * s * 0.9 + _kick.y
-	rotation.z = sin(_t * 41.0) * s * 0.025
 
 
 ## Ray from the screen into the ground plane (y = 0).

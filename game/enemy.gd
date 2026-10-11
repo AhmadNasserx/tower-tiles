@@ -13,6 +13,7 @@ var gold := 1
 var lives := 1
 var is_boss := false
 var size := 1.0
+var intro_hold := false # true while a boss intro shot holds it still (see Game._boss_intro)
 
 var curve: Curve3D
 var path_len := 1.0
@@ -108,8 +109,25 @@ func _process(delta: float) -> void:
 		_reach_cat()
 
 
+## Boss intro: stops the boss in place and idles it. Cleared by Game when the shot ends.
+func begin_intro_hold() -> void:
+	intro_hold = true
+	rig.play("idle", 1.0)
+
+
+## Boss intro roar: the rig puffs up and gestures. Does nothing once the boss is dead.
+func roar() -> void:
+	if alive:
+		rig.roar()
+
+
+## Flat unit vector the enemy walks toward, which is the front of its model.
+func facing() -> Vector3:
+	return _dir
+
+
 func current_speed() -> float:
-	if stun_time > 0.0:
+	if stun_time > 0.0 or intro_hold:
 		return 0.0
 	var s := base_speed * (1.0 - slow_amount)
 	if haste_time > 0.0:
@@ -138,6 +156,10 @@ func _update_transform(delta: float) -> void:
 
 func _animate(delta: float, spd: float) -> void:
 	_squish = move_toward(_squish, 0.0, delta * 4.0)
+	if intro_hold:
+		# keep whatever pose begin_intro_hold / roar set; no wobble
+		rig.rotation.z = 0.0
+		return
 	if stun_time > 0.0:
 		rig.play("idle", 1.0)
 		rig.rotation.z = sin(Time.get_ticks_msec() * 0.02) * 0.15

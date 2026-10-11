@@ -111,6 +111,15 @@ func puff_up() -> void:
 	bounce(0.3)
 
 
+## Boss intro roar: a big puffed-up stretch, a hop, and the positive gesture clip
+## (the pets have no roar clip). Returns to idle when the gesture ends.
+func roar() -> void:
+	puff_up()
+	bounce(0.5)
+	hop(3.0)
+	gesture("gesture-positive")
+
+
 func _process(delta: float) -> void:
 	delta = minf(delta, 1.0 / 30.0)
 	_squash_v += (-_squash * 180.0 - _squash_v * 14.0) * delta

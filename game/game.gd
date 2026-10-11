@@ -88,6 +88,7 @@ var _paw_marker: MeshInstance3D
 var _demo_t := 0.0
 var _cine_slow := 1.0 # multiplies the speed setting during the boss intro shot
 var _cine_tw: Tween
+var _intro_boss: Enemy # the boss held still for its intro shot, if any
 
 
 func _ready() -> void:
@@ -408,16 +409,37 @@ func _spawn(type: String) -> void:
 			Sfx.play("yowl", 1.0, 0.0, -4.0)
 
 
-## Slows game time and frames the boss for a 2.2s intro shot. The slow-mo is a
-## multiplier on the player's speed setting, so 2x/3x and pause still apply.
+## Boss intro (2.6s real time, matching the title card). The camera flies to a
+## face-on close-up of the boss (CameraRig.cinematic_face). The boss holds still
+## from the start and roars as the camera arrives. Game time slows to 0.2x for the
+## hold and comes back as the camera returns. The slow-mo is a multiplier on the
+## player's speed setting, so 2x/3x and pause still apply.
 func _boss_intro(b: Enemy) -> void:
-	camera.cinematic_focus(Vector3(b.global_position.x, 0.0, b.global_position.z), 0.55, 2.2)
+	_release_intro_hold()
+	_intro_boss = b
+	b.begin_intro_hold()
+	camera.cinematic_face(b)
 	if _cine_tw and _cine_tw.is_valid():
 		_cine_tw.kill()
 	_cine_tw = create_tween().set_ignore_time_scale(true)
-	_cine_tw.tween_property(self, "_cine_slow", 0.25, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_cine_tw.tween_interval(1.4)
-	_cine_tw.tween_property(self, "_cine_slow", 1.0, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_property(self, "_cine_slow", 0.2, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_cine_tw.tween_interval(CameraRig.SHOT_IN - 0.3)
+	_cine_tw.tween_callback(_intro_roar)
+	_cine_tw.tween_interval(CameraRig.SHOT_HOLD)
+	_cine_tw.tween_property(self, "_cine_slow", 1.0, CameraRig.SHOT_OUT).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_cine_tw.tween_callback(_release_intro_hold)
+
+
+func _intro_roar() -> void:
+	if is_instance_valid(_intro_boss):
+		_intro_boss.roar()
+
+
+## Lets the intro boss walk again. Safe to call when it is already gone.
+func _release_intro_hold() -> void:
+	if is_instance_valid(_intro_boss):
+		_intro_boss.intro_hold = false
+	_intro_boss = null
 
 
 ## Ends the intro early (the boss died or leaked) and hands speed back.
@@ -425,6 +447,7 @@ func _end_boss_intro() -> void:
 	if _cine_tw and _cine_tw.is_valid():
 		_cine_tw.kill()
 	_cine_slow = 1.0
+	_release_intro_hold()
 	camera.end_cinematic()
 
 

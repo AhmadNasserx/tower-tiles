@@ -33,12 +33,14 @@ Your cat lives at the top of a tower. The neighborhood pack wants in. Build a sq
 Every kitten has 4 levels (its tower grows, max level gets a golden flag), targeting modes (First / Last / Strong / Close) and sells back for 70%.
 
 ### The pack
-Pups (weak), Hounds, Foxes (very fast), Boars (armored, cost 2 lives), Nurse Bunnies (heal nearby friends, but are frail and take extra damage), and two bosses: the **Alpha Hound** (howls to speed up the pack) and **Big Ellie** the elephant (stomps and jams nearby kittens).
+Pups (weak), Hounds, Foxes (very fast), Boars (armored, cost 2 lives), Nurse Bunnies, and two bosses: the **Alpha Hound** (howls to speed up the pack) and **Big Ellie** the elephant (stomps and jams nearby kittens).
+
+**Nurse Bunnies** heal nearby pals for 3% of their max HP every 4 seconds. They never heal bosses or other bunnies, and each pal can be healed once every 3 seconds, so bunnies don't stack on one target. Each cast freezes the bunny for a moment. They're frail: slower than Pups, Hounds and Foxes, and they take 25% extra damage.
 
 ### Upgrades: three layers
 1. **In-run:** level kittens up with gold.
 2. **Purr-ks:** every 3 waves, pick 1 of 3 roguelite perks (Sharp Claws, Catfeine, Lucky Whiskers crits, Yarn Storm, Hoarder interest…). They stack.
-3. **The Cat Tree (meta):** surviving waves earns 🐟 fish, which buy permanent upgrades on the main menu (starting gold, extra lives, damage, paw power, cooldowns, perk rerolls…). Refundable anytime.
+3. **The Cat Tree (meta):** surviving waves earns 🐟 fish, which buy permanent upgrades on the main menu (starting gold, extra lives, damage, paw power, cooldowns, perk rerolls…). Refundable anytime. Fenn, the fox shopkeeper at **Fenn's Fish Stand**, runs the stall: a live 3D fox with a speech bubble who comments on whatever you hover over, cheers your purchases, and grumbles when you're broke or an upgrade is sold out.
 
 Three hand-made maps unlock in order (The Backyard → Garden Maze → The Dog Park), and **Wild Meadow** generates a brand-new winding road, trees and rocks every time you pick it (the map-select card previews the exact layout; Restart keeps it). Each run is 20 waves with a boss every 5; clear it to earn up to ★★★ (no lives lost), then keep going in **Endless Mode**.
 
@@ -49,10 +51,13 @@ Three hand-made maps unlock in order (The Backyard → Garden Maze → The Dog P
 - **UI:** Kenney *UI Pack* and *UI Pack Adventure* (parchment panels, wood plates, ribbons, chunky buttons), **Lilita One** for titles and numbers, **Fredoka** for body text, hand-made SVG icons, and live 3D portraits of every kitten and critter on the cards.
 
 ## Juice
-Screen shake with trauma falloff, hit-stop on big moments, white hit-flash, squash-and-stretch on everything, bouncing critters that get *bonked* off the map, floating damage numbers and crits, kill combos, coins that fly into your gold counter, wave banners, cat reactions (puffing up, hissing, happy hops), a giant paw from the sky, a cat-eye iris transition, procedurally generated sound effects and music, and a live battle running behind the main menu.
+Screen shake with trauma falloff, hit-stop on big moments, white hit-flash, squash-and-stretch on everything, bouncing critters that get *bonked* off the map, floating damage numbers and crits, kill combos, coins that fly into your gold counter, wave banners, cat reactions (puffing up, hissing, happy hops), a giant paw from the sky, a cat-eye iris transition, synthesized sound effects and music, and a live battle running behind the main menu.
+
+**Boss fights** get a show. When a boss spawns, time slows to 20% and the camera swoops to a low, dramatic close-up of its face from the front while it roars. A title card (letterbox bars, the boss's name and a one-line ability blurb) takes the screen, then the camera returns to the battlefield. The boss's health bar shows its HP and pulses red under 25%.
 
 ## Web build & performance
 - **Compatibility renderer** (WebGL 2) and a **single-threaded** export, so it runs on itch.io or GitHub Pages with no special server headers.
+- Audio waits for the first click, tap or key press (browser autoplay rules), then plays normally. Sound and music use stream playback on web.
 - Every tile type, tree and rock on the board is a single `MultiMesh` (one draw call per type, plus one for its outline).
 - No per-instance shader uniforms (they render black on some WebGL 2 drivers); hit flashes swap in a shared material for a few frames instead.
 - Health bars, damage numbers and flying coins are drawn by **one** 2D canvas item instead of hundreds of nodes.
@@ -69,6 +74,7 @@ Screen shake with trauma falloff, hit-stop on big moments, white hit-flash, squa
 
 ## Project layout
 ```
+icon.svg    the game icon, also used for the executable
 autoload/   Save (progress + settings), Sfx (pooled audio + music), Transition (iris wipe),
             Portraits (renders 3D portraits for the UI)
 game/       game.gd (the run), level, enemy, turret, projectile, pet_rig (animated Cube Pets),
@@ -78,7 +84,7 @@ ui/         HUD, UI kit (theme + helpers), cooldown dial, settings panel
 shaders/    toon + outline shaders
 assets/     models/ (Kenney), ui/ (Kenney + SVG icons), fonts/
 scenes/     main_menu + game scenes
-audio/      generated sfx (.wav) and music (.ogg)
+audio/      synthesized sfx (.wav) and music (.ogg)
 tools/      gen_audio.py: regenerates all audio (python3 + numpy + ffmpeg)
 ```
 

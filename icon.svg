@@ -1,40 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#3a2c47"/>
-      <stop offset="1" stop-color="#2a1f33"/>
+      <stop offset="1" stop-color="#231a2c"/>
     </linearGradient>
-    <clipPath id="head">
-      <ellipse cx="64" cy="86" rx="44" ry="32"/>
-    </clipPath>
+    <radialGradient id="glow" cx="64" cy="58" r="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9677ad" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#9677ad" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="26" x2="0" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd23f"/>
+      <stop offset="1" stop-color="#ffb02e"/>
+    </linearGradient>
   </defs>
   <rect width="128" height="128" rx="28" fill="url(#bg)"/>
-  <!-- ears -->
-  <path d="M20 72 L24 34 L52 54 Z" fill="#fffaf2" stroke="#2a1f33" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M108 72 L104 34 L76 54 Z" fill="#fffaf2" stroke="#2a1f33" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M28 62 L29 45 L42 55 Z" fill="#ff9fb5"/>
-  <path d="M100 62 L99 45 L86 55 Z" fill="#ff9fb5"/>
-  <!-- head -->
-  <ellipse cx="64" cy="86" rx="44" ry="32" fill="#fffaf2"/>
-  <ellipse cx="64" cy="128" rx="62" ry="26" fill="#d9d2e3" clip-path="url(#head)"/>
-  <ellipse cx="64" cy="86" rx="44" ry="32" fill="none" stroke="#2a1f33" stroke-width="5"/>
-  <!-- eyes -->
-  <ellipse cx="47" cy="82" rx="9" ry="11" fill="#7bd389" stroke="#2a1f33" stroke-width="2.5"/>
-  <ellipse cx="81" cy="82" rx="9" ry="11" fill="#7bd389" stroke="#2a1f33" stroke-width="2.5"/>
-  <ellipse cx="47" cy="83" rx="3.2" ry="8" fill="#1e1a24"/>
-  <ellipse cx="81" cy="83" rx="3.2" ry="8" fill="#1e1a24"/>
-  <circle cx="50" cy="77.5" r="2.8" fill="#fff"/>
-  <circle cx="84" cy="77.5" r="2.8" fill="#fff"/>
-  <!-- nose and mouth -->
-  <path d="M57 93 L71 93 L64 99 Z" fill="#ff7eb6" stroke="#2a1f33" stroke-width="2" stroke-linejoin="round"/>
-  <path d="M64 99 Q61 105 56 102 M64 99 Q67 105 72 102" fill="none" stroke="#2a1f33" stroke-width="2.5" stroke-linecap="round"/>
-  <!-- tower on the crown -->
-  <line x1="64" y1="32" x2="64" y2="13" stroke="#2a1f33" stroke-width="3.5"/>
-  <path d="M64 14 L80 19.5 L64 25 Z" fill="#e8484f" stroke="#2a1f33" stroke-width="2" stroke-linejoin="round"/>
-  <rect x="42" y="32" width="11" height="12" fill="#9a8fb0" stroke="#2a1f33" stroke-width="4" stroke-linejoin="round"/>
-  <rect x="58.5" y="32" width="11" height="12" fill="#9a8fb0" stroke="#2a1f33" stroke-width="4" stroke-linejoin="round"/>
-  <rect x="75" y="32" width="11" height="12" fill="#9a8fb0" stroke="#2a1f33" stroke-width="4" stroke-linejoin="round"/>
-  <rect x="42" y="41" width="44" height="28" rx="3" fill="#9a8fb0" stroke="#2a1f33" stroke-width="4"/>
-  <rect x="78" y="43" width="6" height="24" fill="#7a6e94"/>
-  <path d="M56 69 L56 60 Q64 50 72 60 L72 69 Z" fill="#2a1f33"/>
+  <rect width="128" height="128" rx="28" fill="url(#glow)"/>
+  <g transform="translate(-2 -2)" stroke="#1e1a24" stroke-width="6" stroke-linejoin="round" paint-order="stroke">
+    <!-- deep extrusion (outlined) -->
+    <g fill="#8a4a1a" transform="translate(4 5)">
+      <path d="M17 26H27V34H33V26H43V34H49V26H59V46H46V92H30V46H17Z"/>
+      <path d="M70 26H80V34H86V26H96V34H102V26H112V46H99V92H83V46H70Z"/>
+    </g>
+    <!-- lit extrusion band (no seam stroke) -->
+    <g fill="#c4621f" stroke="none" transform="translate(2 3)">
+      <path d="M17 26H27V34H33V26H43V34H49V26H59V46H46V92H30V46H17Z"/>
+      <path d="M70 26H80V34H86V26H96V34H102V26H112V46H99V92H83V46H70Z"/>
+    </g>
+    <g fill="url(#gold)">
+      <path d="M17 26H27V34H33V26H43V34H49V26H59V46H46V92H30V46H17Z"/>
+      <path d="M70 26H80V34H86V26H96V34H102V26H112V46H99V92H83V46H70Z"/>
+    </g>
+    <rect x="15" y="95" width="98" height="10" rx="4" fill="#3f9a57"/>
+    <rect x="15" y="88" width="98" height="10" rx="4" fill="#7bd389"/>
+  </g>
 </svg>

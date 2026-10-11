@@ -4,6 +4,7 @@ extends Node
 
 const SettingsPanel := preload("res://ui/settings_panel.gd")
 const GAME_SCENE := preload("res://scenes/game.tscn")
+const FoxShop := preload("res://ui/fox_shopkeeper.gd")
 
 var ui: Control
 var _fish_label: Label
@@ -11,6 +12,11 @@ var _content: Control
 var _menu_col: VBoxContainer
 var _title_letters: Array[Label] = []
 var _t := 0.0
+# Cat Tree state, only while the shop panel is open
+var _shop_fox # FoxShopkeeper
+var _shop_grid: GridContainer
+var _shop_fish_label: Label
+var _hover_id := ""
 
 
 func _ready() -> void:
@@ -170,6 +176,10 @@ func _close_panel() -> void:
 	if _content:
 		_content.queue_free()
 		_content = null
+	_shop_fox = null
+	_shop_grid = null
+	_shop_fish_label = null
+	_hover_id = ""
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -314,34 +324,109 @@ func _map_thumb(m: Dictionary, unlocked: bool) -> Control:
 
 
 func _show_shop() -> void:
-	var v := _open_panel("THE CAT TREE", "", 780)
+	var v := _open_panel("THE CAT TREE", "", 1100)
+	var body := UIKit.hbox(18)
+	v.add_child(body)
+
+	# left: Fenn with his speech bubble, and the stall sign under him
+	var left := UIKit.vbox(10)
+	left.custom_minimum_size.x = 250
+	body.add_child(left)
+	_shop_fox = FoxShop.new()
+	left.add_child(_shop_fox)
+	left.add_child(_fox_sign())
+
+	# right: fish counter, the upgrade stalls, and the buttons
+	var right := UIKit.vbox(10)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(right)
 	var fish_row := UIKit.hbox(8)
 	fish_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	fish_row.add_child(UIKit.icon("fish", Color.WHITE, 36))
-	fish_row.add_child(UIKit.label("%d fish" % Save.fish, 28, Color("2f7fc1"), 0, true))
+	_shop_fish_label = UIKit.label("", 28, Color("2f7fc1"), 0, true)
+	fish_row.add_child(_shop_fish_label)
 	fish_row.add_child(UIKit.label("  ·  Permanent upgrades for every run", 16, UIKit.INK_SOFT))
-	v.add_child(fish_row)
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	v.add_child(grid)
-	var i := 0
-	for id in GameData.META_ORDER:
-		var card := _meta_card(id)
-		grid.add_child(card)
-		UIKit.pop_in(card, 0.05 + i * 0.03)
-		i += 1
+	right.add_child(fish_row)
+	_shop_grid = GridContainer.new()
+	_shop_grid.columns = 3
+	_shop_grid.add_theme_constant_override("h_separation", 10)
+	_shop_grid.add_theme_constant_override("v_separation", 8)
+	right.add_child(_shop_grid)
 	var row := UIKit.hbox(12)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var refund := UIKit.button("Refund all", func():
 		Save.refund_meta()
 		Sfx.play("sell")
-		_show_shop(), 18, "red")
+		_shop_fox.say_refund()
+		_refresh_shop(), 18, "red")
 	refund.tooltip_text = "Get every fish back and re-spec."
 	row.add_child(refund)
 	row.add_child(UIKit.button("Back", _close_panel, 20, "yellow"))
-	v.add_child(row)
+	right.add_child(row)
+
+	_refresh_shop("", true)
+	_shop_fox.greet()
+
+
+## Re-fills the stalls and the fish counter. Only the grid is rebuilt; Fenn is
+## kept, so buying something never restarts him. `bought` gets a small pop.
+func _refresh_shop(bought := "", animate := false) -> void:
+	_shop_fish_label.text = "%d fish" % Save.fish
+	for c in _shop_grid.get_children():
+		_shop_grid.remove_child(c)
+		c.queue_free()
+	var i := 0
+	for id in GameData.META_ORDER:
+		var card := _meta_card(id)
+		_shop_grid.add_child(card)
+		if animate:
+			UIKit.pop_in(card, 0.05 + i * 0.03)
+		elif id == bought:
+			_punch(card)
+		i += 1
+
+
+func _punch(c: Control) -> void:
+	c.resized.connect(func(): c.pivot_offset = c.size * 0.5)
+	c.scale = Vector2(1.12, 1.12)
+	c.create_tween().set_ignore_time_scale(true).tween_property(c, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+
+
+## The wooden stall sign under Fenn.
+func _fox_sign() -> Control:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", UIKit.wood())
+	var l := UIKit.label("FENN'S FISH STAND", 20, UIKit.CREAM, 5, true)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	return p
+
+
+## Striped market awning across the top of a stall card.
+func _awning() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(0, 10)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.resized.connect(c.queue_redraw)
+	c.draw.connect(func():
+		var n := 8
+		var w := c.size.x / n
+		for i in n:
+			c.draw_rect(Rect2(i * w, 0, w + 1, c.size.y), Color("e8484f") if i % 2 == 0 else Color("fff7e6")))
+	return c
+
+
+## Fenn talks about a card the cursor is on. Entering the card and its button
+## both count, so the guard keeps one line per visit.
+func _card_hovered(id: String) -> void:
+	if _hover_id == id or _shop_fox == null:
+		return
+	_hover_id = id
+	var d: Dictionary = GameData.META[id]
+	if Save.meta_level(id) >= d.max:
+		_shop_fox.say_sold_out()
+	else:
+		_shop_fox.say_about(d)
 
 
 func _meta_card(id: String) -> Control:
@@ -351,19 +436,28 @@ func _meta_card(id: String) -> Control:
 	var cost := 0 if maxed else GameData.meta_cost(id, lvl)
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", UIKit.sbox("sq_grey.png", 20, Vector4(12, 8, 12, 14), Color(1.08, 1.06, 1.0) if not maxed else Color(1.15, 1.08, 0.8)))
-	p.custom_minimum_size = Vector2(238, 0)
+	p.custom_minimum_size = Vector2(240, 0)
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.tooltip_text = "Maxed out" if maxed else "Buy for %d fish" % cost
 	var v := UIKit.vbox(2)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(v)
+	v.add_child(_awning())
 	var top := UIKit.hbox(8)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(top)
 	top.add_child(UIKit.icon(d.icon, Color.WHITE, 38))
 	var names := UIKit.vbox(-4)
+	names.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	names.add_child(UIKit.label(d.name, 18, UIKit.INK, 0, true))
 	names.add_child(UIKit.label(d.desc, 13, UIKit.INK_SOFT))
 	top.add_child(names)
 	var bottom := UIKit.hbox(6)
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(bottom)
 	var pips := UIKit.hbox(1)
+	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pips.alignment = BoxContainer.ALIGNMENT_BEGIN
 	for i in d.max:
@@ -374,19 +468,35 @@ func _meta_card(id: String) -> Control:
 	var b: Button
 	if maxed:
 		b = UIKit.button("MAX", func(): pass, 16, "grey")
-		b.disabled = true
 	else:
+		# the price tag: fish icon + cost
 		b = UIKit.button("%d" % cost, func():
 			if Save.buy_meta(id):
 				Sfx.play("upgrade")
 				Sfx.play("meow", 1.2, 0.1, -4.0)
-				_show_shop()
+				_shop_fox.celebrate()
+				_refresh_shop(id)
 			else:
-				Sfx.play("error"), 16, "green", "fish")
-		b.disabled = Save.fish < cost
+				Sfx.play("error")
+				_shop_fox.say_broke(), 16, "green", "fish")
 		b.tooltip_text = "Buy for %d fish" % cost
+	b.disabled = maxed or Save.fish < cost
+	# a disabled button lets clicks fall through to the card, so Fenn can still react
+	if b.disabled:
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.custom_minimum_size.x = 96
 	bottom.add_child(b)
+
+	p.mouse_entered.connect(_card_hovered.bind(id))
+	p.mouse_exited.connect(func(): _hover_id = "")
+	b.mouse_entered.connect(_card_hovered.bind(id))
+	p.gui_input.connect(func(ev):
+		if b.disabled and ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			if maxed:
+				_shop_fox.say_sold_out()
+			else:
+				Sfx.play("error")
+				_shop_fox.say_broke())
 	return p
 
 
